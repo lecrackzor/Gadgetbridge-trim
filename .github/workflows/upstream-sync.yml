@@ -104,10 +104,14 @@ jobs:
       - name: Setup Android SDK
         if: steps.merge.outputs.merged == 'true'
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
-      - name: Accept licenses
+      - name: Accept licenses and install platform
         if: steps.merge.outputs.merged == 'true'
-        run: yes | sdkmanager --licenses >/dev/null || true
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-37" "build-tools;36.0.0"
 
       - name: Build mainline debug (verify trim still compiles)
         id: build

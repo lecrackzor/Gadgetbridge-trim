@@ -5,6 +5,7 @@ name: CI
     branches: [master, feature/trim-workout]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,11 +20,16 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # Do not install the obsolete "tools" package (default of setup-android@v3).
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
-      - name: Accept licenses
-        run: yes | sdkmanager --licenses >/dev/null || true
+      - name: Accept licenses and install platform
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-37" "build-tools;36.0.0"
 
       - name: Build mainline debug
         run: ./gradlew :app:assembleMainlineDebug --no-daemon --stacktrace
