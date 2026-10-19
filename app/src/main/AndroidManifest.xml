@@ -826,6 +826,11 @@
             android:parentActivityName=".activities.workouts.WorkoutListActivity"
             android:windowSoftInputMode="stateHidden" />
         <activity
+            android:name=".activities.workouts.WorkoutTrimActivity"
+            android:label="@string/activity_summary_trim_title"
+            android:parentActivityName=".activities.workouts.WorkoutDetailsActivity"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
             android:name=".activities.ActivitySummariesFilter"
             android:label="@string/activity_filter_filter_title"
             android:parentActivityName=".activities.workouts.WorkoutListActivity"

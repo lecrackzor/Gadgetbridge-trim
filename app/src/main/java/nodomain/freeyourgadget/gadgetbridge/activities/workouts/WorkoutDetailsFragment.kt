@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -30,6 +31,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
@@ -92,6 +94,16 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     private var menu: Menu? = null
 
     private lateinit var workoutViewModel: WorkoutViewModel
+
+    private val trimWorkoutLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            notifyWorkoutChanged()
+            loadWorkoutData()
+            scheduleUploadSync()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -428,6 +440,22 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 true
             }
 
+            R.id.activity_summary_detail_action_trim -> {
+                if (rawDetailsFile == null) {
+                    GB.toast(
+                        requireContext(),
+                        getString(R.string.activity_summary_trim_no_details),
+                        Toast.LENGTH_LONG,
+                        GB.ERROR
+                    )
+                } else {
+                    trimWorkoutLauncher.launch(
+                        WorkoutTrimActivity.createIntent(requireContext(), workoutId)
+                    )
+                }
+                true
+            }
+
             android.R.id.home -> {
                 requireActivity().finish()
                 true
@@ -477,6 +505,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         val overflowMenu2 = menu.findItem(R.id.activity_detail_overflowMenu2)?.subMenu
         overflowMenu2?.findItem(R.id.activity_summary_detail_action_add_photo)?.isVisible = workout.summary.headerPhoto == null
         overflowMenu2?.findItem(R.id.activity_summary_detail_action_remove_photo)?.isVisible = workout.summary.headerPhoto != null
+        overflowMenu2?.findItem(R.id.activity_summary_detail_action_trim)?.isVisible = hasRawDetailsPath
 
         // A service that stores tracks has nothing to take from a workout without one. The others
         // are offered for any workout, since a FIT can be synthesized from the summary alone.

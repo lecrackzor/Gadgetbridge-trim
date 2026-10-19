@@ -39,6 +39,12 @@
                 android:icon="@drawable/ic_gps_edit"
                 android:title="@string/activity_summary_detail_select_gpx_track"
                 app:showAsAction="never" />
+
+            <item
+                android:id="@+id/activity_summary_detail_action_trim"
+                android:icon="@drawable/ic_edit"
+                android:title="@string/activity_summary_trim_title"
+                app:showAsAction="never" />
         </menu>
     </item>
 

@@ -1,0 +1,146 @@
+name: Sync upstream
+
+# Pull Freeyourgadget/Gadgetbridge master, keep our trim commits, and verify the build.
+on:
+  schedule:
+    # Mondays 12:00 UTC
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge upstream and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: master
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://codeberg.org/Freeyourgadget/Gadgetbridge.git 2>/dev/null || git remote set-url upstream https://codeberg.org/Freeyourgadget/Gadgetbridge.git
+          git fetch upstream master
+
+      - name: Merge upstream/master
+        id: merge
+        run: |
+          BEFORE=$(git rev-parse HEAD)
+          UPSTREAM=$(git rev-parse upstream/master)
+          echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "already_up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "already_up_to_date=false" >> "$GITHUB_OUTPUT"
+          if git merge --no-edit upstream/master; then
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            git merge --abort || true
+          fi
+
+      - name: Open issue on merge conflict
+        if: steps.merge.outputs.conflict == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Upstream sync needs manual merge';
+            const body = [
+              'Automatic merge of `upstream/master` (Codeberg Freeyourgadget/Gadgetbridge) into `master` failed.',
+              '',
+              'Resolve locally:',
+              '```bash',
+              'git fetch upstream',
+              'git checkout master',
+              'git merge upstream/master',
+              '# fix conflicts, keep trim workout changes',
+              './gradlew :app:assembleMainlineDebug',
+              'git push origin master',
+              '```',
+              '',
+              `Workflow run: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            ].join('\n');
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+            });
+            if (issues.data.some(i => i.title === title)) {
+              core.info('Conflict issue already open');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+
+      - name: Set up JDK 21
+        if: steps.merge.outputs.merged == 'true' || steps.merge.outputs.already_up_to_date == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        if: steps.merge.outputs.merged == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Accept licenses
+        if: steps.merge.outputs.merged == 'true'
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Build mainline debug (verify trim still compiles)
+        id: build
+        if: steps.merge.outputs.merged == 'true'
+        run: ./gradlew :app:assembleMainlineDebug --no-daemon --stacktrace
+        continue-on-error: true
+
+      - name: Open issue on build failure
+        if: steps.merge.outputs.merged == 'true' && steps.build.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Upstream sync merged but build failed';
+            const body = [
+              'Merged `upstream/master` locally, but `:app:assembleMainlineDebug` failed.',
+              'The merge was **not** pushed. Fix the build, then push `master`.',
+              '',
+              `Workflow run: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+
+      - name: Push master
+        if: steps.merge.outputs.merged == 'true' && steps.build.outcome == 'success'
+        run: git push origin HEAD:master
+
+      - name: Summary
+        run: |
+          echo "already_up_to_date=${{ steps.merge.outputs.already_up_to_date }}"
+          echo "merged=${{ steps.merge.outputs.merged }}"
+          echo "conflict=${{ steps.merge.outputs.conflict }}"
+          echo "build=${{ steps.build.outcome }}"

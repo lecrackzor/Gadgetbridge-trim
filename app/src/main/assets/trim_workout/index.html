@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea">
+<title>Trim workout</title>
+<link rel="stylesheet" href="leaflet.css">
+<style>
+    :root {
+        color-scheme: light;
+        --ink: #1c1915;
+        --muted: #6d675e;
+        --paper: #f4f1ea;
+        --line: #ddd6c8;
+        --green: #0e6b4f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+    }
+    header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+    }
+    header div { min-width: 0; flex: 1; }
+    header strong { display: block; font-size: 15px; letter-spacing: 0; }
+    #fileName {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    button {
+        font: inherit;
+        border: 0;
+        border-radius: 999px;
+        padding: 8px 14px;
+        background: var(--ink);
+        color: var(--paper);
+    }
+    #openBtn { display: none; }
+    #map { flex: 1; min-height: 0; background: #d9d3c5; }
+    #sheet {
+        border-top: 1px solid var(--line);
+        background: var(--paper);
+        padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    }
+    #empty { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; }
+    .stats div { min-width: 0; }
+    .stats b { display: block; font-size: 18px; font-weight: 650; }
+    .stats span { color: var(--muted); font-size: 12px; }
+    .slider { position: relative; height: 36px; margin: 10px 2px 0; }
+    .slider input {
+        position: absolute;
+        left: 0; right: 0; top: 8px;
+        width: 100%;
+        margin: 0;
+        background: none;
+        pointer-events: none;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+    .slider input::-webkit-slider-runnable-track {
+        height: 4px;
+        background: #d9d3c7;
+        border-radius: 99px;
+    }
+    .slider input::-webkit-slider-thumb {
+        pointer-events: auto;
+        -webkit-appearance: none;
+        height: 22px; width: 22px;
+        margin-top: -9px;
+        border-radius: 50%;
+        background: var(--green);
+        border: 2px solid var(--paper);
+        box-shadow: 0 0 0 1px var(--green);
+    }
+    #startRange::-webkit-slider-thumb { background: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+    .times {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .times label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        min-width: 0;
+    }
+    .times input {
+        font: inherit;
+        font-size: 16px;
+        color: var(--ink);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        width: 100%;
+        min-width: 0;
+    }
+    #saveBtn { width: 100%; margin-top: 12px; background: var(--green); }
+    #saveBtn:disabled { opacity: 0.5; }
+    .leaflet-control-attribution { font-size: 10px; }
+</style>
+</head>
+<body>
+<header>
+    <div>
+        <strong>Trim workout</strong>
+        <span id="fileName">Loading…</span>
+    </div>
+    <button id="openBtn" type="button">Open bin</button>
+    <input id="file" type="file" accept=".bin,application/octet-stream" hidden>
+</header>
+<div id="map"></div>
+<section id="sheet">
+    <p id="empty">Loading the activity track. Drag either end, or type the start and end time. Saving updates the raw details and the activity database together.</p>
+    <div id="controls" hidden>
+        <div class="stats">
+            <div><b id="keptTime">—</b><span>Kept</span></div>
+            <div><b id="keptDist">—</b><span>Distance</span></div>
+            <div><b id="cutTime">—</b><span>Cut</span></div>
+        </div>
+        <div class="slider">
+            <input id="startRange" type="range" min="0" max="1" value="0">
+            <input id="endRange" type="range" min="0" max="1" value="1">
+        </div>
+        <div class="times">
+            <label>Start<input id="startTime" type="datetime-local" step="1"></label>
+            <label>End<input id="endTime" type="datetime-local" step="1"></label>
+        </div>
+        <button id="saveBtn" type="button">Save trim</button>
+    </div>
+</section>
+<script src="leaflet.js"></script>
+<script src="trim.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
