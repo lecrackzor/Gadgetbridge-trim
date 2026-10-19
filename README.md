@@ -1,3 +1,23 @@
+> **This is a public fork** of [Freeyourgadget/Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) with an extra feature: **in-app sports workout trim**. Upstream development stays on Codeberg; this repo regularly merges `upstream/master` and keeps the trim feature working. See [FORK.md](FORK.md).
+
+## What this fork adds: Trim workout
+
+Cut leading/trailing junk from Huami / Zepp OS sports activities **inside Gadgetbridge**—no separate app, no manual `.bin` file juggling.
+
+1. Open **Sports activities** → an activity that has raw details  
+2. Edit menu (pencil) → **Trim workout**  
+3. Drag the start/end markers (or use the sliders / times)  
+4. **Save trim** — updates the raw details `.bin` **and** the activity database (times, summary stats, linked GPX) so list/detail stay consistent  
+
+| Edit menu | Trim editor |
+|:---------:|:-----------:|
+| ![Edit menu with Trim workout](docs/images/trim-menu.jpg) | ![Map trim editor](docs/images/trim-editor.jpg) |
+
+Build a debug APK with `./gradlew :app:assembleMainlineDebug` (output under `app/build/outputs/apk/mainline/debug/`).  
+**Note:** a debug build cannot replace an F-Droid/Droidify install (different signing key). Export your data, uninstall the store build, install the debug APK, then import.
+
+---
+
 Gadgetbridge is hosted on [codeberg.org](https://codeberg.org/Freeyourgadget/Gadgetbridge/).
 
 

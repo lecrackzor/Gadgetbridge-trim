@@ -1,53 +1,33 @@
-# Gadgetbridge-trim fork
+# Gadgetbridge-trim fork notes
 
-Personal fork of [Freeyourgadget/Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) with **in-app workout trim** (raw `.bin` + DB stay in sync).
+This repository is a public fork of [Freeyourgadget/Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) with an **in-app workout trim** feature. See the [README](README.md) for screenshots and usage.
 
 ## Remotes
 
 | Remote | URL |
 |--------|-----|
-| `origin` | https://github.com/lecrackzor/Gadgetbridge-trim.git |
+| `origin` | this GitHub fork |
 | `upstream` | https://codeberg.org/Freeyourgadget/Gadgetbridge.git |
 
 ```bash
-git remote -v
-# origin    …/lecrackzor/Gadgetbridge-trim.git
-# upstream  …/Freeyourgadget/Gadgetbridge.git
+git remote add upstream https://codeberg.org/Freeyourgadget/Gadgetbridge.git
 ```
-
-## Trim feature
-
-Sports Activities → activity detail → Edit (pencil) → **Trim workout**.
-
-Save path: backup `.bin.bak` → write trimmed details → patch summary times / Zepp raw summary / `summaryData` → refresh linked GPX → update DB (restore `.bin` if DB update fails).
-
-### Installing over F-Droid / Droidify
-
-Debug builds use the Android **debug** key. You must uninstall the store build first (export your database first, then import after installing the debug APK).
 
 ## Keeping up with upstream
 
 ### Automatic (GitHub Actions)
 
-Workflow **Sync upstream** (`.github/workflows/upstream-sync.yml`):
+- **Sync upstream** (`.github/workflows/upstream-sync.yml`) — weekly + manual: merge Codeberg `master`, build mainline debug, push only if the build succeeds
+- **CI** (`.github/workflows/ci.yml`) — builds on push/PR to `master`
 
-- Runs weekly (Monday) and on demand (`Actions` → Sync upstream → Run workflow)
-- Fetches Codeberg `master`, merges into our `master`
-- Builds `:app:assembleMainlineDebug` so trim still compiles
-- Pushes only if merge + build succeed; otherwise opens a GitHub issue labeled `upstream-sync`
-
-CI (`.github/workflows/ci.yml`) builds mainline debug on every push/PR to `master`.
-
-### Manual (local)
-
-From the `Gadgetbridge` directory (JDK 21 recommended):
+### Manual
 
 ```powershell
-.\scripts\sync-upstream.ps1          # merge + build
-.\scripts\sync-upstream.ps1 -Push    # also push origin
+.\scripts\sync-upstream.ps1
+.\scripts\sync-upstream.ps1 -Push
 ```
 
-Or by hand:
+Or:
 
 ```bash
 git fetch upstream
@@ -57,11 +37,8 @@ git merge upstream/master
 git push origin master
 ```
 
-If `WorkoutDetailsFragment`, menus, or activity-summary parsers conflict, keep the trim menu entry and `WorkoutTrim*` classes.
+If `WorkoutDetailsFragment`, menus, or summary parsers conflict, keep the trim menu entry and `WorkoutTrim*` classes.
 
-## Build
+## Privacy
 
-```bash
-./gradlew :app:assembleMainlineDebug
-# APK: app/build/outputs/apk/mainline/debug/app-mainline-debug.apk
-```
+Do not commit exports, databases, `.bin` workouts, logs, or `local.properties`. Those paths are gitignored where applicable.

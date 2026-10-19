@@ -13,12 +13,22 @@ if (-not (Test-Path ".\gradlew.bat")) {
     throw "Run this from the Gadgetbridge repo root (gradlew.bat not found)."
 }
 
-$jdk = Get-ChildItem "C:\Program Files\Microsoft" -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like "jdk-21*" } |
-    Select-Object -First 1 -ExpandProperty FullName
-if ($jdk) {
-    $env:JAVA_HOME = $jdk
-    $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+# Prefer an already-configured JDK 21+, otherwise try common Windows install roots.
+if (-not $env:JAVA_HOME -or $env:JAVA_HOME -notmatch '21') {
+    $candidates = @(
+        "$env:ProgramFiles\Microsoft",
+        "$env:ProgramFiles\Eclipse Adoptium",
+        "$env:ProgramFiles\Java"
+    ) | Where-Object { Test-Path $_ }
+    $jdk = foreach ($root in $candidates) {
+        Get-ChildItem $root -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match 'jdk-?21|jdk-21' } |
+            Select-Object -First 1 -ExpandProperty FullName
+    } | Select-Object -First 1
+    if ($jdk) {
+        $env:JAVA_HOME = $jdk
+        $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+    }
 }
 
 Write-Host "Fetching upstream..."
