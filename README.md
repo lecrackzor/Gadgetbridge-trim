@@ -9,10 +9,6 @@ Cut leading/trailing junk from Huami / Zepp OS sports activities **inside Gadget
 3. Drag the start/end markers (or use the sliders / times)  
 4. **Save trim** — updates the raw details `.bin` **and** the activity database (times, summary stats, linked GPX) so list/detail stay consistent  
 
-| Edit menu | Trim editor |
-|:---------:|:-----------:|
-| ![Edit menu with Trim workout](docs/images/trim-menu.jpg) | ![Map trim editor](docs/images/trim-editor.jpg) |
-
 Build a debug APK with `./gradlew :app:assembleMainlineDebug` (output under `app/build/outputs/apk/mainline/debug/`).  
 **Note:** a debug build cannot replace an F-Droid/Droidify install (different signing key). Export your data, uninstall the store build, install the debug APK, then import.
 
