@@ -1,7 +1,7 @@
 name: Sync upstream
 
 # Pull Freeyourgadget/Gadgetbridge master, keep our trim commits, and verify the build.
-on:
+"on":
   schedule:
     # Mondays 12:00 UTC
     - cron: "0 12 * * 1"
