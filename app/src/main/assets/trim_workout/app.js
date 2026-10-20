@@ -12,10 +12,23 @@
     var saving = false;
 
     var map = L.map("map", { zoomControl: false, attributionControl: true });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Prefer Carto (allows app WebViews). Fall back to OSM.de if Carto fails to paint.
+    var tiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", {
         maxZoom: 19,
-        attribution: "&copy; OpenStreetMap"
-    }).addTo(map);
+        subdomains: "abcd",
+        attribution: "&copy; OpenStreetMap &copy; CARTO",
+        crossOrigin: true
+    });
+    tiles.on("tileerror", function () {
+        if (tiles._gbFallback) return;
+        tiles._gbFallback = true;
+        map.removeLayer(tiles);
+        L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap"
+        }).addTo(map);
+    });
+    tiles.addTo(map);
     map.setView([20, 0], 2);
     L.control.zoom({ position: "topright" }).addTo(map);
 

@@ -23,14 +23,18 @@ import android.os.Bundle
 import android.util.Base64
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import androidx.webkit.WebViewAssetLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import nodomain.freeyourgadget.gadgetbridge.BuildConfig
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
@@ -123,15 +127,38 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     }
 
     private fun setupWebView() {
+        // Load via https://appassets.androidplatform.net so map tile CDNs accept requests.
+        // file:///android_asset/... often yields a blank basemap with only the GPS path drawn.
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.loadsImagesAutomatically = true
+        webView.settings.blockNetworkImage = false
+        webView.settings.blockNetworkLoads = false
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+        webView.settings.userAgentString =
+            "Gadgetbridge-Trim/${BuildConfig.VERSION_NAME} (${webView.settings.userAgentString})"
         webView.addJavascriptInterface(Bridge(), "Android")
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
-                // app.js auto-loads when Android.getBinLength is present
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?,
+            ) = request?.url?.let { assetLoader.shouldInterceptRequest(it) }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: android.webkit.WebResourceError?,
+            ) {
+                if (request?.isForMainFrame == true) {
+                    LOG.error("Trim WebView error: {} {}", error?.errorCode, error?.description)
+                }
             }
         }
-        webView.loadUrl("file:///android_asset/trim_workout/index.html")
+        webView.loadUrl("https://appassets.androidplatform.net/assets/trim_workout/index.html")
     }
 
     override fun onSupportNavigateUp(): Boolean {

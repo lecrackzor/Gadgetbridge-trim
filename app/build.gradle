@@ -329,6 +329,7 @@ dependencies {
     implementation libs.androidx.lifecycle.viewmodel.ktx
     implementation libs.androidx.security.crypto
     implementation libs.androidx.browser
+    implementation libs.androidx.webkit
     implementation libs.androidx.exifinterface
 
     implementation libs.material
