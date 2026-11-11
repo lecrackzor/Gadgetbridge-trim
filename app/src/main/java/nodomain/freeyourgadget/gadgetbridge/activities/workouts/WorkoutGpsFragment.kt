@@ -110,8 +110,26 @@ class WorkoutGpsFragment : Fragment() {
         ensureMapInitialized()
 
         if (!mapValid) {
-            mapsManager?.reload()
             mapValid = true
+            val manager = mapsManager
+            if (manager != null) {
+                lifecycleScope.launch {
+                    try {
+                        val mapData = withContext(Dispatchers.IO) { manager.loadMapData() }
+                        if (_binding == null || mapsManager !== manager) {
+                            return@launch
+                        }
+                        manager.applyMapLoadResult(mapData)
+                        manager.reload()
+                        if (manager.isMapLoaded) {
+                            binding.missingMapsWarning.visibility = View.GONE
+                        }
+                        drawPendingTrackIfReady()
+                    } catch (e: Exception) {
+                        LOG.error("Failed reloading maps", e)
+                    }
+                }
+            }
         }
 
         loadTrackDataIfReady()

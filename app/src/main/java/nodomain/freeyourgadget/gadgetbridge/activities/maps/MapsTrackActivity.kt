@@ -157,8 +157,21 @@ class MapsTrackActivity : AbstractGBActivity(), MenuProvider {
     override fun onResume() {
         super.onResume()
         if (!mapValid) {
-            mapsManager.reload()
             mapValid = true
+            lifecycleScope.launch {
+                try {
+                    val mapData = withContext(Dispatchers.IO) { mapsManager.loadMapData() }
+                    mapsManager.applyMapLoadResult(mapData)
+                    mapsManager.reload()
+                    mapsReady = true
+                    pendingTrackPoints?.let { pending ->
+                        mapsManager.setTrack(pending)
+                        pendingTrackPoints = null
+                    }
+                } catch (e: Exception) {
+                    LOG.error("Failed reloading maps", e)
+                }
+            }
         }
     }
 

@@ -36,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
@@ -174,14 +173,15 @@ public final class MapsManager {
      * Draws the track polyline. When {@code fitBounds} is false, only the path is updated —
      * the current center/zoom are left alone (needed for interactive trim previews).
      */
+    /** Cap drawn vertices so long activities cannot ANR the UI thread. */
+    private static final int MAX_TRACK_DRAW_POINTS = 2500;
+
     public void setTrack(final List<? extends GPSCoordinate> trackPoints, final boolean fitBounds) {
         if (trackPoints == null || trackPoints.isEmpty()) {
             return;
         }
 
-        final List<LatLong> points = trackPoints.stream()
-                .map(p -> new LatLong(p.getLatitude(), p.getLongitude()))
-                .collect(Collectors.toList());
+        final List<LatLong> points = toDisplayLatLongs(trackPoints);
 
         if (polyline == null) {
             final Paint paint = AndroidGraphicFactory.INSTANCE.createPaint();
@@ -213,6 +213,29 @@ public final class MapsManager {
                 latitudeAccumulator.getMax(),
                 longitudeAccumulator.getMax()
         ));
+    }
+
+    private static List<LatLong> toDisplayLatLongs(final List<? extends GPSCoordinate> trackPoints) {
+        final int n = trackPoints.size();
+        if (n <= MAX_TRACK_DRAW_POINTS) {
+            final List<LatLong> points = new java.util.ArrayList<>(n);
+            for (final GPSCoordinate trackPoint : trackPoints) {
+                points.add(new LatLong(trackPoint.getLatitude(), trackPoint.getLongitude()));
+            }
+            return points;
+        }
+
+        // Evenly sample, always keep first and last so the path endpoints stay correct.
+        final List<LatLong> points = new java.util.ArrayList<>(MAX_TRACK_DRAW_POINTS);
+        final int last = n - 1;
+        for (int i = 0; i < MAX_TRACK_DRAW_POINTS; i++) {
+            final int index = (i == MAX_TRACK_DRAW_POINTS - 1)
+                    ? last
+                    : (int) ((long) i * last / (MAX_TRACK_DRAW_POINTS - 1));
+            final GPSCoordinate trackPoint = trackPoints.get(index);
+            points.add(new LatLong(trackPoint.getLatitude(), trackPoint.getLongitude()));
+        }
+        return points;
     }
 
     /**
@@ -259,6 +282,11 @@ public final class MapsManager {
         }
     }
 
+    /**
+     * Re-applies track color / theme without reopening map files.
+     * Prefer {@link #loadMapData()} + {@link #applyMapLoadResult(MapLoadResult)} when the
+     * maps folder itself may have changed — and run the load off the UI thread.
+     */
     public void reload() {
         if (polyline != null) {
             final int trackColor = mapDataLoader.resolveTrackColor();
@@ -266,6 +294,9 @@ public final class MapsManager {
             polyline.requestRedraw();
         }
 
-        loadMaps();
+        if (tileRendererLayer != null) {
+            tileRendererLayer.setXmlRenderTheme(mapDataLoader.resolveTheme());
+            tileRendererLayer.requestRedraw();
+        }
     }
 }

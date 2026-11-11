@@ -20,8 +20,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -78,8 +76,6 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     private var mapsReady: Boolean = false
 
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-    private val mapPreviewHandler = Handler(Looper.getMainLooper())
-    private val mapPreviewRunnable = Runnable { drawKeptTrack(fitBounds = false) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -121,12 +117,8 @@ class WorkoutTrimActivity : AbstractGBActivity() {
             override fun onStartTrackingTouch(slider: RangeSlider) = Unit
 
             override fun onStopTrackingTouch(slider: RangeSlider) {
-                mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
-                drawKeptTrack(fitBounds = false)
-                val points = parsed?.points ?: return
-                if (points.isEmpty()) return
-                setTimeInput(startTimeInput, points[startIndex.coerceIn(0, points.lastIndex)].time)
-                setTimeInput(endTimeInput, points[endIndex.coerceIn(0, points.lastIndex)].time)
+                // Map work only on finger-up — mid-drag polyline rebuilds are a common ANR source.
+                updatePreview(syncSlider = false, fromUser = false)
             }
         })
 
@@ -265,13 +257,10 @@ class WorkoutTrimActivity : AbstractGBActivity() {
         }
 
         if (!mapsReady) return
+        // While dragging, only update the cheap text stats — never touch Mapsforge mid-gesture.
+        if (fromUser) return
 
-        mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
-        if (!mapFitted || !fromUser) {
-            drawKeptTrack(fitBounds = !mapFitted)
-        } else {
-            mapPreviewHandler.postDelayed(mapPreviewRunnable, MAP_PREVIEW_DEBOUNCE_MS)
-        }
+        drawKeptTrack(fitBounds = !mapFitted)
     }
 
     private fun drawKeptTrack(fitBounds: Boolean) {
@@ -459,7 +448,6 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     }
 
     override fun onDestroy() {
-        mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
         mapsManager?.onDestroy()
         mapsManager = null
         super.onDestroy()
@@ -472,7 +460,6 @@ class WorkoutTrimActivity : AbstractGBActivity() {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(WorkoutTrimActivity::class.java)
-        private const val MAP_PREVIEW_DEBOUNCE_MS = 48L
         const val EXTRA_WORKOUT_ID = "workout_id"
 
         fun createIntent(context: Context, workoutId: Long): Intent {
