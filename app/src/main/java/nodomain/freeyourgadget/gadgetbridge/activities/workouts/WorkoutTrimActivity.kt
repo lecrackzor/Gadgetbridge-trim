@@ -20,6 +20,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -72,8 +74,12 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     private var startIndex: Int = 0
     private var endIndex: Int = 0
     private var updatingControls: Boolean = false
+    private var mapFitted: Boolean = false
+    private var mapsReady: Boolean = false
 
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    private val mapPreviewHandler = Handler(Looper.getMainLooper())
+    private val mapPreviewRunnable = Runnable { drawKeptTrack(fitBounds = false) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,33 +106,56 @@ class WorkoutTrimActivity : AbstractGBActivity() {
         trimSave = findViewById(R.id.trim_save)
 
         mapView.setBuiltInZoomControls(false)
-        mapsManager = MapsManager(this, mapView).also { manager ->
-            manager.loadMaps()
-            missingMapsWarning.visibility =
-                if (manager.isMapLoaded) View.GONE else View.VISIBLE
-        }
+        mapsManager = MapsManager(this, mapView)
 
         trimSave.setOnClickListener { saveTrim() }
-        trimRange.addOnChangeListener { slider, _, _ ->
+        trimRange.addOnChangeListener { slider, _, fromUser ->
             if (updatingControls) return@addOnChangeListener
             val values = slider.values
             if (values.size < 2) return@addOnChangeListener
             startIndex = values[0].toInt()
             endIndex = values[1].toInt()
-            updatePreview()
+            updatePreview(syncSlider = false, fromUser = fromUser)
         }
+        trimRange.addOnSliderTouchListener(object : RangeSlider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: RangeSlider) = Unit
+
+            override fun onStopTrackingTouch(slider: RangeSlider) {
+                mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
+                drawKeptTrack(fitBounds = false)
+                val points = parsed?.points ?: return
+                if (points.isEmpty()) return
+                setTimeInput(startTimeInput, points[startIndex.coerceIn(0, points.lastIndex)].time)
+                setTimeInput(endTimeInput, points[endIndex.coerceIn(0, points.lastIndex)].time)
+            }
+        })
 
         bindTimeField(startTimeInput, which = "start")
         bindTimeField(endTimeInput, which = "end")
 
         lifecycleScope.launch {
             val ok = withContext(Dispatchers.IO) { loadAndParse() }
-            loadingSpinner.visibility = View.GONE
             if (!ok) {
+                loadingSpinner.visibility = View.GONE
                 finish()
                 return@launch
             }
             setupControls()
+            try {
+                val manager = mapsManager ?: return@launch
+                // Opening .map files is disk-heavy; do it off the UI thread so BLE stays responsive.
+                val mapData = withContext(Dispatchers.IO) { manager.loadMapData() }
+                manager.applyMapLoadResult(mapData)
+                mapsReady = true
+                missingMapsWarning.visibility =
+                    if (manager.isMapLoaded) View.GONE else View.VISIBLE
+                drawKeptTrack(fitBounds = true)
+            } catch (e: Exception) {
+                LOG.error("Failed loading maps for trim", e)
+                missingMapsWarning.visibility = View.VISIBLE
+            } finally {
+                loadingSpinner.visibility = View.GONE
+            }
         }
     }
 
@@ -205,10 +234,10 @@ class WorkoutTrimActivity : AbstractGBActivity() {
         trimRange.values = listOf(0f, max.coerceAtLeast(1f))
         trimRange.isEnabled = points.size > 1
         updatingControls = false
-        updatePreview()
+        updatePreview(syncSlider = false, fromUser = false)
     }
 
-    private fun updatePreview() {
+    private fun updatePreview(syncSlider: Boolean, fromUser: Boolean) {
         val points = parsed?.points ?: return
         if (points.isEmpty()) return
         val start = startIndex.coerceIn(0, points.lastIndex)
@@ -218,36 +247,69 @@ class WorkoutTrimActivity : AbstractGBActivity() {
 
         val slice = points.subList(start, end + 1)
         val durationMs = (slice.last().time - slice.first().time).coerceAtLeast(0)
-        val distance = HuamiBinTrim.pathDistance(slice)
         keptTime.text = formatDuration(durationMs)
-        keptDistance.text = formatDistance(distance)
         cutTime.text = cutLabel(
             points[start].time - points.first().time,
             points.last().time - points[end].time,
         )
+        if (!fromUser) {
+            keptDistance.text = formatDistance(HuamiBinTrim.pathDistance(slice))
+            setTimeInput(startTimeInput, points[start].time)
+            setTimeInput(endTimeInput, points[end].time)
+        }
 
-        setTimeInput(startTimeInput, points[start].time)
-        setTimeInput(endTimeInput, points[end].time)
+        if (syncSlider) {
+            updatingControls = true
+            trimRange.values = listOf(start.toFloat(), end.toFloat().coerceAtLeast(start.toFloat()))
+            updatingControls = false
+        }
 
-        updatingControls = true
-        trimRange.values = listOf(start.toFloat(), end.toFloat().coerceAtLeast(start.toFloat()))
-        updatingControls = false
+        if (!mapsReady) return
 
-        val gpsPoints = slice.mapNotNull { p ->
+        mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
+        if (!mapFitted || !fromUser) {
+            drawKeptTrack(fitBounds = !mapFitted)
+        } else {
+            mapPreviewHandler.postDelayed(mapPreviewRunnable, MAP_PREVIEW_DEBOUNCE_MS)
+        }
+    }
+
+    private fun drawKeptTrack(fitBounds: Boolean) {
+        val points = parsed?.points ?: return
+        if (points.isEmpty()) return
+        val start = startIndex.coerceIn(0, points.lastIndex)
+        val end = endIndex.coerceIn(start, points.lastIndex)
+        val slice = points.subList(start, end + 1)
+        keptDistance.text = formatDistance(HuamiBinTrim.pathDistance(slice))
+
+        val gpsPoints = ArrayList<GPSCoordinate>(slice.size)
+        for (p in slice) {
             if (p.lat != null && p.lon != null) {
-                GPSCoordinate(p.lon, p.lat, p.altitude ?: GPSCoordinate.UNKNOWN_ALTITUDE)
-            } else {
-                null
+                gpsPoints.add(
+                    GPSCoordinate(p.lon, p.lat, p.altitude ?: GPSCoordinate.UNKNOWN_ALTITUDE)
+                )
             }
         }
-        if (gpsPoints.size >= 2) {
-            mapView.post {
-                try {
-                    mapsManager?.setTrack(gpsPoints)
-                } catch (e: Exception) {
-                    LOG.warn("Failed drawing trim preview track", e)
+        if (gpsPoints.size < 2) return
+        try {
+            // Fit once to the full track so dragging only redraws the polyline.
+            if (fitBounds && !mapFitted) {
+                val fullGps = ArrayList<GPSCoordinate>(points.size)
+                for (p in points) {
+                    if (p.lat != null && p.lon != null) {
+                        fullGps.add(
+                            GPSCoordinate(p.lon, p.lat, p.altitude ?: GPSCoordinate.UNKNOWN_ALTITUDE)
+                        )
+                    }
+                }
+                if (fullGps.size >= 2) {
+                    mapsManager?.setTrack(fullGps, true)
+                    mapFitted = true
                 }
             }
+            mapsManager?.setTrack(gpsPoints, false)
+        } catch (e: Exception) {
+            LOG.warn("Failed drawing trim preview track", e)
         }
     }
 
@@ -273,13 +335,13 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     private fun applyTypedTime(which: String, value: String?) {
         val points = parsed?.points ?: return
         if (points.isEmpty() || value.isNullOrBlank()) {
-            updatePreview()
+            updatePreview(syncSlider = true, fromUser = false)
             return
         }
         val ms = parseLocalTime(value)
         if (ms == null) {
             GB.toast(this, getString(R.string.activity_summary_trim_invalid_time), Toast.LENGTH_SHORT, GB.WARN)
-            updatePreview()
+            updatePreview(syncSlider = true, fromUser = false)
             return
         }
         if (which == "start") {
@@ -287,7 +349,7 @@ class WorkoutTrimActivity : AbstractGBActivity() {
         } else {
             endIndex = nearestTime(ms).coerceAtLeast(startIndex)
         }
-        updatePreview()
+        updatePreview(syncSlider = true, fromUser = false)
     }
 
     private fun parseLocalTime(value: String): Long? {
@@ -397,6 +459,7 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     }
 
     override fun onDestroy() {
+        mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
         mapsManager?.onDestroy()
         mapsManager = null
         super.onDestroy()
@@ -409,6 +472,7 @@ class WorkoutTrimActivity : AbstractGBActivity() {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(WorkoutTrimActivity::class.java)
+        private const val MAP_PREVIEW_DEBOUNCE_MS = 48L
         const val EXTRA_WORKOUT_ID = "workout_id"
 
         fun createIntent(context: Context, workoutId: Long): Intent {

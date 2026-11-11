@@ -137,10 +137,22 @@ class WorkoutGpsFragment : Fragment() {
             return
         }
 
-        mapsManager = MapsManager(requireContext(), binding.mapView).also { manager ->
-            manager.loadMaps()
-            if (manager.isMapLoaded) {
-                binding.missingMapsWarning.visibility = View.GONE
+        val manager = MapsManager(requireContext(), binding.mapView)
+        mapsManager = manager
+        // Map .map files are large; load them off the main thread to avoid UI/BLE stalls.
+        lifecycleScope.launch {
+            try {
+                val mapData = withContext(Dispatchers.IO) { manager.loadMapData() }
+                if (_binding == null || mapsManager !== manager) {
+                    return@launch
+                }
+                manager.applyMapLoadResult(mapData)
+                if (manager.isMapLoaded) {
+                    binding.missingMapsWarning.visibility = View.GONE
+                }
+                drawPendingTrackIfReady()
+            } catch (e: Exception) {
+                LOG.error("Failed loading maps", e)
             }
         }
     }

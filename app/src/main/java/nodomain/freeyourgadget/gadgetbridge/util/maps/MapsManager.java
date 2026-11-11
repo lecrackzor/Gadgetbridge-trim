@@ -72,7 +72,22 @@ public final class MapsManager {
         this.mapDataLoader = new MapDataLoader(context);
     }
 
+    /**
+     * Opens map files from the configured folder. Safe to call off the main thread —
+     * pair with {@link #applyMapLoadResult(MapLoadResult)} on the UI thread.
+     */
+    public MapLoadResult loadMapData() {
+        return mapDataLoader.loadMultiMapDataStore();
+    }
+
     public void loadMaps() {
+        applyMapLoadResult(loadMapData());
+    }
+
+    /**
+     * Applies a previously loaded datastore to the MapView. Must run on the UI thread.
+     */
+    public void applyMapLoadResult(final MapLoadResult loadResult) {
         if (tileRendererLayer != null) {
             mapView.getLayerManager().getLayers().remove(tileRendererLayer);
             tileRendererLayer.onDestroy();
@@ -83,10 +98,10 @@ public final class MapsManager {
         mapView.getModel().displayModel.setBackgroundColor(GBApplication.getWindowBackgroundColor(mapView.getContext()));
 
         isMapLoaded = false;
+        tileRenderedAdded = false;
 
         AndroidGraphicFactory.createInstance(GBApplication.app());
 
-        final MapLoadResult loadResult = mapDataLoader.loadMultiMapDataStore();
         isMapLoaded = loadResult.getAnyLoaded();
 
         final TileCache tileCache = AndroidUtil.createTileCache(
@@ -110,9 +125,6 @@ public final class MapsManager {
         tileRendererLayer.setXmlRenderTheme(mapDataLoader.resolveTheme());
         // Do not add the tile renderer layer before setting the bounding box in setTrack,
         // otherwise we load the entire map to memory and might crash with OOM
-        if (tileRenderedAdded) {
-            mapView.getLayerManager().getLayers().add(0, tileRendererLayer);
-        }
     }
 
     public boolean isMapLoaded() {
@@ -155,16 +167,17 @@ public final class MapsManager {
     }
 
     public void setTrack(final List<? extends GPSCoordinate> trackPoints) {
-        final Accumulator latitudeAccumulator = new Accumulator();
-        final Accumulator longitudeAccumulator = new Accumulator();
-        for (GPSCoordinate trackPoint : trackPoints) {
-            latitudeAccumulator.add(trackPoint.getLatitude());
-            longitudeAccumulator.add(trackPoint.getLongitude());
+        setTrack(trackPoints, true);
+    }
+
+    /**
+     * Draws the track polyline. When {@code fitBounds} is false, only the path is updated —
+     * the current center/zoom are left alone (needed for interactive trim previews).
+     */
+    public void setTrack(final List<? extends GPSCoordinate> trackPoints, final boolean fitBounds) {
+        if (trackPoints == null || trackPoints.isEmpty()) {
+            return;
         }
-        final double maxLat = latitudeAccumulator.getMax();
-        final double minLat = latitudeAccumulator.getMin();
-        final double maxLon = longitudeAccumulator.getMax();
-        final double minLon = longitudeAccumulator.getMin();
 
         final List<LatLong> points = trackPoints.stream()
                 .map(p -> new LatLong(p.getLatitude(), p.getLongitude()))
@@ -182,7 +195,24 @@ public final class MapsManager {
         }
         polyline.setPoints(points);
 
-        setBoundingBox(minimalBoundingBox(minLat, minLon, maxLat, maxLon));
+        if (!fitBounds) {
+            // Keep an already-fitted view stable (trim slider); still attach tiles if needed.
+            addTileRendererLayer();
+            return;
+        }
+
+        final Accumulator latitudeAccumulator = new Accumulator();
+        final Accumulator longitudeAccumulator = new Accumulator();
+        for (GPSCoordinate trackPoint : trackPoints) {
+            latitudeAccumulator.add(trackPoint.getLatitude());
+            longitudeAccumulator.add(trackPoint.getLongitude());
+        }
+        setBoundingBox(minimalBoundingBox(
+                latitudeAccumulator.getMin(),
+                longitudeAccumulator.getMin(),
+                latitudeAccumulator.getMax(),
+                longitudeAccumulator.getMax()
+        ));
     }
 
     /**

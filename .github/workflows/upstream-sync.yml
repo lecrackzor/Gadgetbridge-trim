@@ -94,6 +94,32 @@ jobs:
               body,
             });
 
+      - name: Close stale conflict issue after clean merge
+        if: steps.merge.outputs.merged == 'true' || steps.merge.outputs.already_up_to_date == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Upstream sync needs manual merge';
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+            });
+            for (const issue of issues.data.filter(i => i.title === title)) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: 'Upstream merge is unblocked again; closing this issue.',
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+            }
+
       - name: Set up JDK 21
         if: steps.merge.outputs.merged == 'true' || steps.merge.outputs.already_up_to_date == 'true'
         uses: actions/setup-java@v4

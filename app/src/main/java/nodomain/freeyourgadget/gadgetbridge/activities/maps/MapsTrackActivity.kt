@@ -27,13 +27,18 @@ import android.view.MenuItem
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.core.view.MenuProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityMapsTrackBinding
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
@@ -46,6 +51,8 @@ class MapsTrackActivity : AbstractGBActivity(), MenuProvider {
 
     private lateinit var mapsManager: MapsManager
     private var mapValid = true
+    private var mapsReady = false
+    private var pendingTrackPoints: List<GPSCoordinate>? = null
 
     private val mReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -64,7 +71,19 @@ class MapsTrackActivity : AbstractGBActivity(), MenuProvider {
         setContentView(binding.root)
 
         mapsManager = MapsManager(this, binding.mapView)
-        mapsManager.loadMaps()
+        lifecycleScope.launch {
+            try {
+                val mapData = withContext(Dispatchers.IO) { mapsManager.loadMapData() }
+                mapsManager.applyMapLoadResult(mapData)
+                mapsReady = true
+                pendingTrackPoints?.let { pending ->
+                    mapsManager.setTrack(pending)
+                    pendingTrackPoints = null
+                }
+            } catch (e: Exception) {
+                LOG.error("Failed loading maps", e)
+            }
+        }
 
         val summary = intent.extras?.getSerializableCompat<BaseActivitySummary>("summary")
         if (summary == null) {
@@ -97,7 +116,11 @@ class MapsTrackActivity : AbstractGBActivity(), MenuProvider {
     private fun observeViewModel() {
         viewModel.trackPoints.observe(this) { points ->
             if (points.isNotEmpty()) {
-                mapsManager.setTrack(points)
+                if (mapsReady) {
+                    mapsManager.setTrack(points)
+                } else {
+                    pendingTrackPoints = points
+                }
             } else {
                 LOG.warn("No track points to display or file was empty.")
             }
