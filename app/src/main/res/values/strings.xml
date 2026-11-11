@@ -2087,6 +2087,16 @@
     <string name="activity_summary_trim_no_details">This activity has no raw details file to trim</string>
     <string name="activity_summary_trim_saved">Workout trimmed</string>
     <string name="activity_summary_trim_failed">Could not save the trimmed workout</string>
+    <string name="activity_summary_trim_save">Save trim</string>
+    <string name="activity_summary_trim_kept">Kept</string>
+    <string name="activity_summary_trim_distance">Distance</string>
+    <string name="activity_summary_trim_cut">Cut</string>
+    <string name="activity_summary_trim_cut_none">None</string>
+    <string name="activity_summary_trim_cut_start">%1$s off the start</string>
+    <string name="activity_summary_trim_cut_end">%1$s off the end</string>
+    <string name="activity_summary_trim_invalid_time">Could not parse that time</string>
+    <string name="activity_summary_trim_no_points">No track points found in this workout</string>
+    <string name="end">End</string>
     <string name="activity_summary_detail_select_gpx_track">Select GPX track</string>
     <string name="activity_summary_detail_clear_gpx_track">Clear GPX track</string>
     <string name="activity_summary_detail_editing_gpx_track">Editing linked GPX track</string>
