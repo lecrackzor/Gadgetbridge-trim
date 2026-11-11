@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -88,6 +90,11 @@ public class DeviceManager {
     private static final long DEVICE_CHANGED_THROTTLE_MS = 250;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable deviceChangedRunnable = this::onDeviceChanged;
+    /**
+     * DB writes from device broadcasts must not run on the main thread. Dashboard/widget
+     * queries can hold the DB lock for a long time; waiting for that lock on main causes ANRs.
+     */
+    private ExecutorService dbExecutor;
     private boolean deviceChangedPending = false;
     private boolean initialized = false;
 
@@ -114,18 +121,18 @@ public class DeviceManager {
                     GBDevice dev = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE);
                     boolean newDevice = false;
                     if (dev != null && dev.getAddress() != null) {
+                        final GBDevice deviceInList;
                         int index = deviceList.indexOf(dev); // search by address
                         if (index >= 0) {
-                            deviceList.get(index).copyFromDevice(dev);
+                            deviceInList = deviceList.get(index);
+                            deviceInList.copyFromDevice(dev);
                         } else {
                             deviceList.add(dev);
+                            deviceInList = dev;
                             newDevice = true;
                         }
-                        if (dev.isInitialized()) {
-                            try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                                DBHelper.getDevice(dev, dbHandler.getDaoSession()); // implicitly creates the device in database if not present, and updates device attributes
-                            } catch (Exception ignore) {
-                            }
+                        if (deviceInList.isInitialized() && dbExecutor != null && !dbExecutor.isShutdown()) {
+                            dbExecutor.execute(() -> persistDevice(deviceInList));
                         }
                     }
                     updateSelectedDevices();
@@ -156,6 +163,13 @@ public class DeviceManager {
             return;
         }
         initialized = true;
+        if (dbExecutor == null || dbExecutor.isShutdown()) {
+            dbExecutor = Executors.newSingleThreadExecutor(r -> {
+                final Thread thread = new Thread(r, "DeviceManager-db");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
         registerReceivers();
         refreshPairedDevices();
     }
@@ -174,6 +188,7 @@ public class DeviceManager {
         context.unregisterReceiver(mReceiver);
         handler.removeCallbacks(deviceChangedRunnable);
         deviceChangedPending = false;
+        dbExecutor.shutdownNow();
     }
 
     private void registerReceivers() {
@@ -188,6 +203,15 @@ public class DeviceManager {
         filterGlobal.addAction(BLUETOOTH_DEVICE_ACTION_ALIAS_CHANGED);
         filterGlobal.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         ContextCompat.registerReceiver(context, mReceiver, filterGlobal, ContextCompat.RECEIVER_EXPORTED);
+    }
+
+    private void persistDevice(final GBDevice device) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            // implicitly creates the device in database if not present, and updates device attributes
+            DBHelper.getDevice(device, dbHandler.getDaoSession());
+        } catch (Exception e) {
+            LOG.warn("Failed to persist device {}", device.getAddress(), e);
+        }
     }
 
     private void updateDeviceName(BluetoothDevice device, String newName) {

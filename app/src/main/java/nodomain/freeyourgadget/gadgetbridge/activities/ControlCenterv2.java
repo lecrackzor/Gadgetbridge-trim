@@ -513,15 +513,27 @@ public class ControlCenterv2 extends AppCompatActivity
             launchWelcomeActivity();
         }
 
+        // Changelog builds HTML + creates a WebView on the UI thread. After a large version
+        // jump (or on every debug APK install) that can ANR before the first frame. Debug
+        // builds skip the auto dialog; release builds defer it until after layout.
         final GBChangeLog cl = GBChangeLog.createChangeLog(this);
-        if (cl.isFirstRunEver()) {
+        if (cl.isFirstRunEver() || GBApplication.isDebug()) {
             cl.skipLogDialog();
-        } else if (prefs.getBoolean("show_changelog", true) && cl.isFirstRun() && cl.hasChanges(false)) {
-            try {
-                cl.getMaterialLogDialog().show();
-            } catch (Exception ex) {
-                GB.toast(this, getString(R.string.error_showing_changelog), Toast.LENGTH_LONG, GB.ERROR, ex);
-            }
+        } else if (prefs.getBoolean("show_changelog", true) && cl.isFirstRun()) {
+            viewPager.post(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                try {
+                    if (cl.hasChanges(false)) {
+                        cl.getMaterialLogDialog().show();
+                    } else {
+                        cl.skipLogDialog();
+                    }
+                } catch (Exception ex) {
+                    GB.toast(this, getString(R.string.error_showing_changelog), Toast.LENGTH_LONG, GB.ERROR, ex);
+                }
+            });
         }
 
         GBApplication.deviceService().requestDeviceInfo();
