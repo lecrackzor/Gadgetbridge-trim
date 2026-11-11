@@ -77,13 +77,8 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
                     .filterIsInstance<Chip>()
                     .count { it.isChecked }
                 if (isChecked) {
-                    if (checkedCount > 2) {
-                        chip.isChecked = false
-                        Toast.makeText(this, context.getString(R.string.charts_two_items_only), Toast.LENGTH_SHORT).show()
-                    } else {
-                        selectedCharts.add(tag)
-                        refreshChart()
-                    }
+                    selectedCharts.add(tag)
+                    refreshChart()
                 } else {
                     if (checkedCount == 0) {
                         chip.isChecked = true
@@ -206,13 +201,8 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
             listView.setOnItemClickListener { _, _, which, _ ->
                 val isChecked = listView.isItemChecked(which)
                 if (isChecked) {
-                    if (selectedIndices.size == 2) {
-                        listView.setItemChecked(which, false)
-                        Toast.makeText(this, context.getString(R.string.charts_two_items_only), Toast.LENGTH_SHORT).show()
-                    } else {
-                        selectedIndices.add(which)
-                        chipUpdate(ids[which], true)
-                    }
+                    selectedIndices.add(which)
+                    chipUpdate(ids[which], true)
                 } else {
                     if (selectedIndices.size == 1) {
                         listView.setItemChecked(which, true)

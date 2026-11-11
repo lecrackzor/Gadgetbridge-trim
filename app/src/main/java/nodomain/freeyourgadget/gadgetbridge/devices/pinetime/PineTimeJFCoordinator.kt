@@ -21,8 +21,6 @@ package nodomain.freeyourgadget.gadgetbridge.devices.pinetime
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.prefixNotificationWithAppName
@@ -35,7 +33,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.PineTimeActivitySample
-import nodomain.freeyourgadget.gadgetbridge.entities.PineTimeActivitySampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.pinetime.PineTimeJFSupport
@@ -102,8 +99,14 @@ class PineTimeJFCoordinator : AbstractBLEDeviceCoordinator() {
         return true
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return PineTimeJFSupport::class.java
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
+
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return PineTimeJFSupport()
     }
 
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
@@ -118,14 +121,6 @@ class PineTimeJFCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getDefaultIconResource(): Int {
         return R.drawable.ic_device_pinetime
-    }
-
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>?, Property?> {
-        return object : HashMap<AbstractDao<*, *>?, Property?>() {
-            init {
-                put(session.pineTimeActivitySampleDao, PineTimeActivitySampleDao.Properties.DeviceId)
-            }
-        }
     }
 
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind {

@@ -84,6 +84,13 @@ public class DailyTotals implements Serializable {
         return sleep[0] + sleep[1] + sleep[2];
     }
 
+    /**
+     * Light, deep, REM and awake sleep minutes.
+     */
+    public long[] getSleepStages() {
+        return sleep;
+    }
+
     public static DailyTotals getDailyTotalsForDevice(GBDevice device, Calendar day) {
 
         try (DBHandler handler = GBApplication.acquireDB()) {

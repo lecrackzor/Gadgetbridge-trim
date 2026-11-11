@@ -1,14 +1,10 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.onetouch
 
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
-import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.ServiceDeviceSupport
@@ -25,8 +21,8 @@ class OneTouchCoordinator : AbstractBLEDeviceCoordinator() {
         return "LifeScan"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport?> {
-        return OneTouchSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return OneTouchSupport()
     }
 
     override fun getInitialFlags(): EnumSet<ServiceDeviceSupport.Flags> {
@@ -73,14 +69,6 @@ class OneTouchCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getDeviceSpecificSettingsCustomizer(device: GBDevice): DeviceSpecificSettingsCustomizer? {
         return OneTouchSettingsCustomizer()
-    }
-
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> {
-        return object : HashMap<AbstractDao<*, *>, Property>() {
-            init {
-                put(session.glucoseSampleDao, GlucoseSampleDao.Properties.DeviceId)
-            }
-        }
     }
 
     override fun supportsDataFetching(device: GBDevice): Boolean {

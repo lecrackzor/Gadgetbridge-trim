@@ -32,12 +32,12 @@ import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartDataBuilder;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFragment.CyclingChartsData>{
     private LineChart cyclingHistoryChart;
@@ -48,7 +48,6 @@ public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFrag
     private int LEGEND_TEXT_COLOR;
     private int CHART_LINE_COLOR_DISTANCE;
     private int CHART_LINE_COLOR_SPEED;
-    private final Prefs prefs = GBApplication.getPrefs();
 
     protected static class CyclingChartsData extends DefaultChartsData<LineData> {
         public CyclingChartsData(LineData lineData) {
@@ -67,7 +66,7 @@ public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFrag
         LEGEND_TEXT_COLOR = DESCRIPTION_COLOR = GBApplication.getTextColor(requireContext());
         CHART_TEXT_COLOR = GBApplication.getSecondaryTextColor(requireContext());
 
-        if (prefs.getBoolean("chart_heartrate_color", false)) {
+        if (GBApplication.getPrefs().getChartsHeartRateColor() == ChartsHeartRateColor.RED) {
             CHART_LINE_COLOR_DISTANCE = ContextCompat.getColor(getContext(), R.color.chart_activity_dark);
             CHART_LINE_COLOR_SPEED  = ContextCompat.getColor(getContext(), R.color.chart_heartrate);
         } else {
@@ -144,7 +143,7 @@ public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFrag
             }
 
             LineDataSet distanceSet = new LineDataSet(distanceEntries, "Cycling");
-            distanceSet.setLineWidth(2.2f);
+            distanceSet.setLineWidth(ChartDataBuilder.LINE_WIDTH_DP);
             distanceSet.setColor(CHART_LINE_COLOR_DISTANCE);
             distanceSet.setDrawCirclesEnabled(false);
             distanceSet.setDrawCircleHoleEnabled(false);
@@ -157,7 +156,7 @@ public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFrag
             LineData lineData = new LineData(distanceSet);
 
             LineDataSet speedSet = new LineDataSet(speedEntries, "Speed");
-            speedSet.setLineWidth(2.2f);
+            speedSet.setLineWidth(ChartDataBuilder.LINE_WIDTH_DP);
             speedSet.setColor(CHART_LINE_COLOR_SPEED);
             speedSet.setDrawCirclesEnabled(false);
             speedSet.setDrawCircleHoleEnabled(false);

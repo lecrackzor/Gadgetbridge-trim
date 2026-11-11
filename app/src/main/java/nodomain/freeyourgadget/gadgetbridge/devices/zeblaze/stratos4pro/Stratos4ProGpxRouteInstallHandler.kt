@@ -61,7 +61,7 @@ class Stratos4ProGpxRouteInstallHandler(uri: Uri, context: Context) : GpxRouteIn
 
     private fun readFit(uri: Uri, context: Context): GpxFile? = try {
         val helper = UriHelper.get(uri, context)
-        fitToGpx(helper.openInputStream().use { FileUtils.readAll(it, 10 * 1024 * 1024) }, helper.fileName?.substringBeforeLast('.'))
+        fitToGpx(helper.openInputStream().use { FileUtils.readAll(it, 10 * 1024 * 1024) }, helper.fileName.substringBeforeLast('.'))
     } catch (e: Exception) {
         LOG.warn("Not a usable FIT route: {}", e.toString())
         null

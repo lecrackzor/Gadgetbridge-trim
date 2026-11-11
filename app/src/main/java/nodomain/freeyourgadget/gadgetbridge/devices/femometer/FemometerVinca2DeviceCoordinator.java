@@ -18,19 +18,14 @@ package nodomain.freeyourgadget.gadgetbridge.devices.femometer;
 
 import androidx.annotation.NonNull;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-import de.greenrobot.dao.AbstractDao;
-import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.FemometerVinca2TemperatureSample;
-import nodomain.freeyourgadget.gadgetbridge.entities.FemometerVinca2TemperatureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.femometer.FemometerVinca2DeviceSupport;
@@ -44,8 +39,8 @@ public class FemometerVinca2DeviceCoordinator extends AbstractBLEDeviceCoordinat
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return FemometerVinca2DeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new FemometerVinca2DeviceSupport();
     }
 
     @Override
@@ -67,13 +62,6 @@ public class FemometerVinca2DeviceCoordinator extends AbstractBLEDeviceCoordinat
     @Override
     public int getDefaultIconResource() {
         return R.drawable.ic_device_thermometer;
-    }
-
-    @Override
-    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(1);
-        map.put(session.getFemometerVinca2TemperatureSampleDao(), FemometerVinca2TemperatureSampleDao.Properties.DeviceId);
-        return map;
     }
 
     @Override

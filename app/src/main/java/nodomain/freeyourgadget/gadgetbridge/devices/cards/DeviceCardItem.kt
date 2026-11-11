@@ -7,23 +7,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 /**
  * A single item rendered in the device list card's icon row.
  */
-sealed interface DeviceCardItem {
-    /**
-     * A stable identifier, used to persist the order and the removed items.
-     */
-    val id: String
-
-    /**
-     * Whether the item is displayed for the current device state.
-     */
-    fun isVisible(device: GBDevice): Boolean
-
-    /**
-     * Whether the item is not present by default - the user must add it.
-     */
-    val optional: Boolean
-        get() = false
-}
+sealed interface DeviceCardItem : DeviceCardEntry
 
 /**
  * A clickable icon that triggers an action.

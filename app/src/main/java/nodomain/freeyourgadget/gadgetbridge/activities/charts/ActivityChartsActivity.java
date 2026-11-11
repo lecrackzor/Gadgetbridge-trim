@@ -398,6 +398,7 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
             return true;
         } else if (itemId == R.id.prefs_charts_menu) {
             final Intent settingsIntent = new Intent(this, ChartsPreferencesActivity.class);
+            settingsIntent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
             chartsPreferencesLauncher.launch(settingsIntent);
             return true;
         }
@@ -552,6 +553,24 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
             return enabledTabsList.size();
         }
 
+        /**
+         * The IDs depend on the chart, so that a restored fragment is not used in a position
+         * where the tabs list has a different chart.
+         */
+        @Override
+        public long getItemId(final int position) {
+            return enabledTabsList.get(position).hashCode();
+        }
+
+        @Override
+        public boolean containsItem(final long itemId) {
+            for (final String tab : enabledTabsList) {
+                if (tab.hashCode() == itemId) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /**

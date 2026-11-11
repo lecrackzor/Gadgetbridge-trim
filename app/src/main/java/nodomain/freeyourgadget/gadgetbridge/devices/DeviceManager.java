@@ -22,7 +22,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Handler;
+import android.os.Looper;
 
+import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -34,6 +37,7 @@ import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +50,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.DeviceHelper;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
+import nodomain.freeyourgadget.gadgetbridge.widgets.DashboardDefaults;
 
 /**
  * Provides access to the list of devices managed by Gadgetbridge.
@@ -74,6 +79,18 @@ public class DeviceManager {
     private final List<GBDevice> deviceList = new ArrayList<>();
     private List<GBDevice> selectedDevices = new ArrayList<>();
 
+    /**
+     * The addresses of the devices in the database at the last refresh, or null before the first refresh.
+     */
+    @Nullable
+    private Set<String> knownAddresses;
+
+    private static final long DEVICE_CHANGED_THROTTLE_MS = 250;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable deviceChangedRunnable = this::onDeviceChanged;
+    private boolean deviceChangedPending = false;
+    private boolean initialized = false;
+
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -95,12 +112,14 @@ public class DeviceManager {
                     break;
                 case GBDevice.ACTION_DEVICE_CHANGED:
                     GBDevice dev = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE);
+                    boolean newDevice = false;
                     if (dev != null && dev.getAddress() != null) {
                         int index = deviceList.indexOf(dev); // search by address
                         if (index >= 0) {
                             deviceList.get(index).copyFromDevice(dev);
                         } else {
                             deviceList.add(dev);
+                            newDevice = true;
                         }
                         if (dev.isInitialized()) {
                             try (DBHandler dbHandler = GBApplication.acquireDB()) {
@@ -109,8 +128,14 @@ public class DeviceManager {
                             }
                         }
                     }
-                    updateSelectedDevice(dev);
-                    refreshPairedDevices();
+                    updateSelectedDevices();
+                    if (newDevice) {
+                        GB.updateNotification(selectedDevices, context);
+                        refreshPairedDevices();
+                    } else if (!deviceChangedPending) {
+                        deviceChangedPending = true;
+                        handler.postDelayed(deviceChangedRunnable, DEVICE_CHANGED_THROTTLE_MS);
+                    }
                     break;
             }
         }
@@ -118,6 +143,40 @@ public class DeviceManager {
 
     public DeviceManager(Context context) {
         this.context = context;
+    }
+
+    /**
+     * Starts managing devices: registers the broadcast receivers and loads the devices from the
+     * database. Must be called after the application has finished its initialization (prefs and
+     * database). Does nothing if already initialized.
+     */
+    @MainThread
+    public void initialize() {
+        if (initialized) {
+            return;
+        }
+        initialized = true;
+        registerReceivers();
+        refreshPairedDevices();
+    }
+
+    /**
+     * Stops managing devices: unregisters the broadcast receivers registered by {@link #initialize()}.
+     * Does nothing if not initialized. {@link #initialize()} may be called again afterwards.
+     */
+    @MainThread
+    public void shutdown() {
+        if (!initialized) {
+            return;
+        }
+        initialized = false;
+        LocalBroadcastManager.getInstance(context).unregisterReceiver(mReceiver);
+        context.unregisterReceiver(mReceiver);
+        handler.removeCallbacks(deviceChangedRunnable);
+        deviceChangedPending = false;
+    }
+
+    private void registerReceivers() {
         IntentFilter filterLocal = new IntentFilter();
         filterLocal.addAction(DeviceManager.ACTION_REFRESH_DEVICELIST);
         filterLocal.addAction(GBDevice.ACTION_DEVICE_CHANGED);
@@ -129,8 +188,6 @@ public class DeviceManager {
         filterGlobal.addAction(BLUETOOTH_DEVICE_ACTION_ALIAS_CHANGED);
         filterGlobal.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         ContextCompat.registerReceiver(context, mReceiver, filterGlobal, ContextCompat.RECEIVER_EXPORTED);
-
-        refreshPairedDevices();
     }
 
     private void updateDeviceName(BluetoothDevice device, String newName) {
@@ -145,25 +202,57 @@ public class DeviceManager {
         }
     }
 
-    private void updateSelectedDevice(GBDevice dev) {
+    private void updateSelectedDevices() {
         selectedDevices.clear();
         for(GBDevice device : deviceList){
             if(device.isInitialized()){
                 selectedDevices.add(device);
             }
         }
+    }
+
+    private void onDeviceChanged() {
+        deviceChangedPending = false;
         GB.updateNotification(selectedDevices, context);
+        sortDevices();
+        notifyDevicesChanged();
     }
 
     private void refreshPairedDevices() {
         final Set<GBDevice> availableDevices = DeviceHelper.getInstance().getAvailableDevices();
+        final List<GBDevice> addedDevices = new ArrayList<>();
+        if (knownAddresses != null) {
+            for (final GBDevice availableDevice : availableDevices) {
+                if (!knownAddresses.contains(availableDevice.getAddress())) {
+                    LOG.info("Device {} was added", availableDevice.getAddress());
+                    addedDevices.add(availableDevice);
+                }
+            }
+        }
+        knownAddresses = addressesOf(availableDevices);
         deviceList.retainAll(availableDevices);
         for (GBDevice availableDevice : availableDevices) {
             if (!deviceList.contains(availableDevice)) {
                 deviceList.add(availableDevice);
             }
         }
+        for (final GBDevice addedDevice : addedDevices) {
+            DashboardDefaults.INSTANCE.onDeviceAdded(addedDevice);
+        }
 
+        sortDevices();
+        notifyDevicesChanged();
+    }
+
+    private static Set<String> addressesOf(final Set<GBDevice> devices) {
+        final Set<String> addresses = new HashSet<>();
+        for (final GBDevice device : devices) {
+            addresses.add(device.getAddress());
+        }
+        return addresses;
+    }
+
+    private void sortDevices() {
         // Snapshot the sort keys up front, instead of re-reading mutable GBDevice
         // fields on every compare() call. GBDevice state can be mutated concurrently by
         // device support threads while this sort runs, and re-reading it mid-sort can
@@ -200,7 +289,6 @@ public class DeviceManager {
             }
             return collator.compare(lhsKey.aliasOrName, rhsKey.aliasOrName);
         });
-        notifyDevicesChanged();
     }
 
     private record DeviceSortKey(int stateOrdinal,
@@ -214,6 +302,19 @@ public class DeviceManager {
      */
     public List<GBDevice> getDevices() {
         return Collections.unmodifiableList(deviceList);
+    }
+
+    /**
+     * Returns the devices that support vendor data import.
+     */
+    public List<GBDevice> getSupportedDevices() {
+        final List<GBDevice> supportedDevices = new ArrayList<>();
+        for (final GBDevice device : deviceList) {
+            if (device.getDeviceCoordinator().getVendorDataImporter(device) != null) {
+                supportedDevices.add(device);
+            }
+        }
+        return supportedDevices;
     }
 
     @Nullable

@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 Arjan Schrijver
+/*  Copyright (C) 2026 Arjan Schrijver, José Rebelo, Dany Mestas
 
     This file is part of Gadgetbridge.
 
@@ -16,93 +16,57 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.Toast
-import androidx.core.content.edit
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.externalservices.externalServiceLoginResultKey
-import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploader
+import nodomain.freeyourgadget.gadgetbridge.externalservices.AbstractApiTokenSetupBottomSheet
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceCalls
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
-import org.slf4j.LoggerFactory
 
-class WandererSetupBottomSheet : BottomSheetDialogFragment() {
-    private val LOG = LoggerFactory.getLogger(WandererSetupBottomSheet::class.java)
-    private val prefs get() = GBApplication.getPrefs().preferences
+class WandererSetupBottomSheet : AbstractApiTokenSetupBottomSheet(
+    R.layout.wanderer_bottomsheet_setup_wizard,
+    R.id.wanderer_api_token,
+    R.id.wanderer_server_name
+) {
+    override val service = WandererService
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View = inflater.inflate(
-        R.layout.wanderer_bottomsheet_setup_wizard,
-        container,
-        false
-    )
+    /**
+     * Handle read while the token was being checked, so it is stored alongside it. Null when the
+     * server did not give one, which only costs the link to the trail.
+     */
+    private var handle: String? = null
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+    override fun validate(apiToken: String): String? = when {
+        serverName.isEmpty() || apiToken.isEmpty() ->
+            getString(R.string.service_setup_missing_information)
 
-        val serverNameInput = view.findViewById<EditText>(R.id.wanderer_server_name)
-        val apiTokenInput = view.findViewById<EditText>(R.id.wanderer_api_token)
-        val saveButton = view.findViewById<Button>(R.id.save_button)
+        !apiToken.startsWith(WandererTokenManager.TOKEN_PREFIX) ->
+            getString(R.string.service_setup_api_token_prefix_error, WandererTokenManager.TOKEN_PREFIX)
 
-        serverNameInput.setText(prefs.getString("wanderer_server", ""))
+        else -> null
+    }
 
-        saveButton.setOnClickListener {
-            val serverName = serverNameInput.text.toString().trim()
-            val apiToken = apiTokenInput.text.toString().trim()
+    override fun checkToken(apiToken: String): Pair<Boolean, String?> {
+        val context = requireContext()
+        val apiClient = WandererApiClient(serverName, WandererTokenManager(context))
+        val timeout = WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS
 
-            if (serverName.isEmpty() || apiToken.isEmpty()) {
-                GB.toast(getString(R.string.wanderer_setup_missing_information), Toast.LENGTH_SHORT, GB.WARN)
-                return@setOnClickListener
-            }
-            if (!apiToken.startsWith("wanderer_key_")) {
-                GB.toast(getString(R.string.wanderer_setup_api_token_error), Toast.LENGTH_SHORT, GB.WARN)
-                return@setOnClickListener
-            }
+        val reachable = ExternalServiceCalls.await<Pair<Boolean, String?>>(timeout) { done ->
+            apiClient.checkServerReachable(apiToken) { ok, reason -> done(ok to reason) }
+        } ?: return false to InternetUtils.connectFailureReason(context, serverName)
+        if (!reachable.first) {
+            return false to (reachable.second ?: InternetUtils.connectFailureReason(context, serverName))
+        }
 
-            // Verify the server is reachable and the API key is valid before saving, so a bad URL /
-            // dead server / missing internet / wrong key is reported now instead of silently at the
-            // first upload.
-            saveButton.isEnabled = false
-            val apiClient = WandererApiClient(serverName, WandererTokenManager(requireContext()))
-            apiClient.checkServerReachable(apiToken) { reachable, reason ->
-                if (!reachable) {
-                    activity?.runOnUiThread {
-                        saveButton.isEnabled = true
-                        GB.toast(
-                            reason ?: InternetUtils.connectFailureReason(requireContext(), serverName),
-                            Toast.LENGTH_LONG,
-                            GB.ERROR
-                        )
-                    }
-                    return@checkServerReachable
-                }
-                // The handle only names the account, so setup carries on without it and the
-                // workout upload status falls back to showing the trail id on its own.
-                apiClient.fetchUserHandle(apiToken) { handle ->
-                    activity?.runOnUiThread {
-                        saveButton.isEnabled = true
-                        LOG.info("Saving Wanderer server ({}) and API token", serverName)
-                        prefs.edit { putString("wanderer_server", serverName) }
-                        val tokenManager = WandererTokenManager(requireContext())
-                        tokenManager.saveToken(apiToken)
-                        handle?.let { tokenManager.saveHandle(it) }
-                        parentFragmentManager.setFragmentResult(
-                            externalServiceLoginResultKey(WandererService.id),
-                            Bundle().apply { putBoolean("success", true) }
-                        )
-                        dismiss()
-                    }
-                }
-            }
+        handle = ExternalServiceCalls.await<String?>(timeout) { done ->
+            apiClient.fetchUserHandle(apiToken) { done(it) }
+        }
+        return true to null
+    }
+
+    override fun onTokenAccepted(apiToken: String) {
+        WandererTokenManager(requireContext()).apply {
+            saveToken(apiToken)
+            handle?.let { saveHandle(it) }
         }
     }
 }

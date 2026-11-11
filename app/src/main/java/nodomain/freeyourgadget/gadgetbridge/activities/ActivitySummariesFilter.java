@@ -67,7 +67,7 @@ public class ActivitySummariesFilter extends AbstractGBActivity {
     private static final Logger LOG = LoggerFactory.getLogger(ActivitySummariesFilter.class);
     private static final String PREF_QUICK_FILTER = "workout_list_quick_filter";
     private static final String QUICK_FILTER_NONE = "noselection";
-    private static final long ALL_DEVICES = 999;
+    public static final long ALL_DEVICES = 999;
     private int activityFilter = 0;
     private long dateFromFilter = 0;
     private long dateToFilter = 0;

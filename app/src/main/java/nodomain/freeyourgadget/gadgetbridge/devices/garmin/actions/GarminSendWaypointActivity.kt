@@ -27,6 +27,8 @@ import android.content.IntentFilter
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -36,6 +38,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.install.FileInstallerActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.maps.MapsSettingsFragment
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivitySendWaypointBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit
@@ -45,19 +48,39 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.WaypointHelper
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition
+import org.mapsforge.core.model.LatLong
 import org.slf4j.LoggerFactory
+import java.util.Locale
 
 class GarminSendWaypointActivity : AbstractGBActivity() {
     private var device: GBDevice? = null
     private lateinit var binding: ActivitySendWaypointBinding
+    private lateinit var mapController: WaypointMapController
+    private var mapValid = true
 
     private var elevationInFeet = false
+
+    private val selectPoint = registerForActivityResult(GarminWaypointMapActivity.SelectPoint()) { latLong ->
+        if (latLong != null) {
+            LOG.debug("Waypoint selected on the map: {}", latLong)
+            setPosition(latLong.latitude, latLong.longitude)
+        }
+    }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 GB.ACTION_SET_FINISHED -> {
-                    GB.toast(this@GarminSendWaypointActivity, R.string.devicestatus_upload_completed, Toast.LENGTH_SHORT, GB.INFO);
+                    GB.toast(
+                        this@GarminSendWaypointActivity,
+                        R.string.devicestatus_upload_completed,
+                        Toast.LENGTH_SHORT,
+                        GB.INFO
+                    )
+                }
+
+                MapsSettingsFragment.ACTION_SETTING_CHANGE -> {
+                    mapValid = false
                 }
             }
         }
@@ -68,6 +91,19 @@ class GarminSendWaypointActivity : AbstractGBActivity() {
 
         binding = ActivitySendWaypointBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        mapController = WaypointMapController(this, binding.mapPreview.mapView, null)
+        updateMissingMapsWarning()
+        val tapDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                selectPoint.launch(mapController.waypoint)
+                return true
+            }
+        })
+        binding.mapPreview.mapView.setOnTouchListener { _, event ->
+            tapDetector.onTouchEvent(event)
+            true
+        }
 
         val distanceUnit = GBApplication.getPrefs().distanceUnit
         val uom: String
@@ -131,14 +167,47 @@ class GarminSendWaypointActivity : AbstractGBActivity() {
             noLocationFound(intent.dataString ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT))
         }
 
+        mapController.showInitialPosition()
+
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, IntentFilter().apply {
             addAction(GB.ACTION_SET_FINISHED)
+            addAction(MapsSettingsFragment.ACTION_SETTING_CHANGE)
         })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!mapValid) {
+            mapController.mapsManager.reload()
+            updateMissingMapsWarning()
+            mapValid = true
+        }
+        mapController.startLocationUpdates()
+    }
+
+    override fun onPause() {
+        mapController.stopLocationUpdates()
+        super.onPause()
     }
 
     override fun onDestroy() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
+        mapController.onDestroy()
         super.onDestroy()
+    }
+
+    private fun updateMissingMapsWarning() {
+        binding.mapPreview.missingMapsWarning.visibility =
+            if (mapController.mapsManager.isMapLoaded) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * Sets the coordinates of the waypoint and clears the elevation, which is not known for the new position.
+     */
+    private fun setPosition(latitude: Double, longitude: Double) {
+        binding.waypointLatitude.setText(String.format(Locale.ROOT, "%.6f", latitude))
+        binding.waypointLongitude.setText(String.format(Locale.ROOT, "%.6f", longitude))
+        binding.waypointElevation.text = null
     }
 
     fun noLocationFound(received: CharSequence? = null) {
@@ -365,6 +434,14 @@ class GarminSendWaypointActivity : AbstractGBActivity() {
             val latitude = binding.waypointLatitude.text.toString().toDoubleOrNull()
             val longitude = binding.waypointLongitude.text.toString().toDoubleOrNull()
             val formated = WaypointHelper.formatPosition(latitude, longitude)
+            mapController.setWaypoint(
+                if (binding.waypointLatitude.error == null && binding.waypointLongitude.error == null) {
+                    LatLong(latitude!!, longitude!!)
+                } else {
+                    null
+                }
+            )
+
             if (formated != null) {
                 binding.waypointInfo0.text = formated[0]
                 binding.waypointInfo1.text = formated[1]

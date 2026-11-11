@@ -91,6 +91,26 @@ public class AmazfitBand5Coordinator extends HuamiCoordinator {
     }
 
     @Override
+    public boolean supportsSpo2(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPai(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public DeviceSpecificSettings getDeviceSpecificSettings(final GBDevice device) {
         final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
 
@@ -164,8 +184,8 @@ public class AmazfitBand5Coordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return AmazfitBand5Support.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new AmazfitBand5Support();
     }
 
     @Override

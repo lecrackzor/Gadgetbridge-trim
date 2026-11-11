@@ -23,7 +23,6 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
-import org.json.JSONArray;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;

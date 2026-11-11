@@ -16,20 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.qnscale
 
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericWeightSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.qnscale.QnScaleDeviceSupport
-import java.util.Collections
 import java.util.regex.Pattern
 
 /**
@@ -40,12 +36,9 @@ import java.util.regex.Pattern
  * [GenericWeightSampleProvider] / codeberg.org/Freeyourgadget/Gadgetbridge/issues/6393).
  */
 class QnScaleCoordinator : AbstractBLEDeviceCoordinator() {
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>?, Property?> {
-        return Collections.singletonMap(session.genericWeightSampleDao, GenericWeightSampleDao.Properties.DeviceId)
-    }
-
     override fun getSupportedDeviceName(): Pattern {
-        return Pattern.compile("QN-Scale.*")
+        // The GE Fit Plus is a QN-Scale sold under its own name.
+        return Pattern.compile("QN-Scale.*|Fit Plus", Pattern.CASE_INSENSITIVE)
     }
 
     override fun getManufacturer(): String {
@@ -73,8 +66,8 @@ class QnScaleCoordinator : AbstractBLEDeviceCoordinator() {
         return true
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport?> {
-        return QnScaleDeviceSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return QnScaleDeviceSupport()
     }
 
     override fun getDeviceNameResource(): Int {

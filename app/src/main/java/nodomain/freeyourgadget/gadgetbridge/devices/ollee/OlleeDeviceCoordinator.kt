@@ -40,8 +40,8 @@ class OlleeDeviceCoordinator : AbstractBLEDeviceCoordinator() {
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
         DeviceCoordinator.DeviceKind.WATCH
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
-        OlleeDeviceSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport =
+        OlleeDeviceSupport()
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_ollee_watch_one
 
@@ -75,4 +75,6 @@ class OlleeDeviceCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getSampleProvider(device: GBDevice, session: DaoSession): SampleProvider<out AbstractActivitySample> =
         OlleeActivitySampleProvider(device, session)
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
 }

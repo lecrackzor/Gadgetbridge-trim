@@ -26,7 +26,10 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Device
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.ActionCardItem
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -48,8 +51,8 @@ class AAWirelessCoordinator : AbstractBLClassicDeviceCoordinator() {
         return "AAWireless"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return AAWirelessSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return AAWirelessSupport()
     }
 
     override fun getDeviceNameResource(): Int {
@@ -257,6 +260,15 @@ class AAWirelessCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind {
         return DeviceCoordinator.DeviceKind.UNKNOWN
     }
+
+    override fun getCardItems(device: GBDevice): List<DeviceCardItem> =
+        super.getCardItems(device) + ActionCardItem(
+            action = DeviceCardAction.forActivity(
+                R.drawable.ic_smartphone,
+                R.string.paired_phones,
+                AAWirelessPairedPhonesActivity::class.java,
+            ),
+        )
 
     companion object {
         private fun buttonModeEntries(device: GBDevice): List<ListEntry> {

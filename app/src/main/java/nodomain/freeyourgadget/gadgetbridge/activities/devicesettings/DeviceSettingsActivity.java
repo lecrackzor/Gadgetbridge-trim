@@ -18,11 +18,15 @@ package nodomain.freeyourgadget.gadgetbridge.activities.devicesettings;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.preference.PreferenceFragmentCompat;
 
 import com.bytehamster.lib.preferencesearch.SearchPreferenceResult;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractSettingsActivityV2;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec;
@@ -30,6 +34,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 
 public class DeviceSettingsActivity extends AbstractSettingsActivityV2 {
+    private static final Logger LOG = LoggerFactory.getLogger(DeviceSettingsActivity.class);
+
     public static final String MENU_ENTRY_POINT = "MENU_ENTRY_POINT";
 
     public enum MENU_ENTRY_POINTS {
@@ -64,6 +70,15 @@ public class DeviceSettingsActivity extends AbstractSettingsActivityV2 {
         intent.putExtra(GBDevice.EXTRA_DEVICE, device);
         intent.putExtra(MENU_ENTRY_POINT, MENU_ENTRY_POINTS.DEVICE_SETTINGS);
         return intent;
+    }
+
+    @Override
+    protected void onCreate(final Bundle savedInstanceState) {
+        if (getIntent().getParcelableExtra(GBDevice.EXTRA_DEVICE) == null) {
+            LOG.error("Started without a device");
+            finish();
+        }
+        super.onCreate(savedInstanceState);
     }
 
     @Override

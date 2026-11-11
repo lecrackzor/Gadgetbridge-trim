@@ -43,6 +43,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
@@ -51,6 +52,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
+import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectUtils
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.slf4j.LoggerFactory
@@ -141,17 +143,21 @@ internal object RecordedWorkoutSyncer {
                 val recordsToInsert = mutableListOf<Record>()
                 val exerciseType = WorkoutSyncerUtils.mapActivityKindToExerciseType(activityKind)
 
-                var activityPoints: List<ActivityPoint>? = null
-
-                if (useDetailedSync) {
-                    activityPoints = loadActivityPoints(workout, gbDevice, context)
+                val needsTrackForSets = WorkoutSyncerUtils.usesSetSegments(exerciseType)
+                val loadedTrack = if (useDetailedSync || needsTrackForSets) {
+                    loadActivityTrack(workout, gbDevice, context)
+                } else {
+                    null
                 }
+                val activityPoints = loadedTrack?.points
 
-                if (activityPoints != null && activityPoints.isNotEmpty()) {
+                if (useDetailedSync && loadedTrack != null && activityPoints != null && activityPoints.isNotEmpty()) {
                     LOG.info("Using detailed sync with ${activityPoints.size} activity points for workout (Type: ${activityKind}, Start: $workoutStartInstant).")
+                    correctElevation(workout, gbDevice, context, activityPoints)
                     processDetailedWorkout(
                         workout,
                         activityPoints,
+                        loadedTrack.track.sets,
                         workoutStartInstant,
                         workoutEndInstant,
                         startOffset,
@@ -168,15 +174,12 @@ internal object RecordedWorkoutSyncer {
                     )
                 } else {
                     if (useDetailedSync) {
-                        if (activityPoints == null) {
-                            LOG.info("No track file available for workout, falling back to aggregate data.")
-                        } else {
-                            LOG.info("Track file contains no activity points, falling back to aggregate data.")
-                        }
+                        LOG.info("No track file or no activity points for workout, falling back to aggregate data.")
                     }
                     processAggregateWorkout(
                         gbDevice,
                         workout,
+                        loadedTrack?.track?.sets.orEmpty(),
                         workoutStartInstant,
                         workoutEndInstant,
                         startOffset,
@@ -333,24 +336,38 @@ internal object RecordedWorkoutSyncer {
         }
     }
 
-    private fun loadActivityPoints(workout: BaseActivitySummary, device: GBDevice, context: Context): List<ActivityPoint>? {
+    private data class LoadedTrack(val track: ActivityTrack, val points: List<ActivityPoint>)
+
+    private fun loadActivityTrack(workout: BaseActivitySummary, device: GBDevice, context: Context): LoadedTrack? {
         val activityTrackProvider = device.deviceCoordinator.getActivityTrackProvider(device, context)
         if (activityTrackProvider == null) {
             LOG.debug("No activity track provider available device '{}'.", device)
             return null
         }
 
-        val points = activityTrackProvider.getActivityTrack(workout)?.allPoints
-        if (points.isNullOrEmpty()) {
+        val activityTrack = activityTrackProvider.getActivityTrack(workout) ?: return null
+        val points = activityTrack.allPoints
+        if (points.isEmpty()) {
             LOG.debug("Track file for workout {} contains no activity points", workout.id)
-            return null
         }
-        return points
+        return LoadedTrack(activityTrack, points)
     }
 
-    private fun processDetailedWorkout(
+    private fun correctElevation(workout: BaseActivitySummary, device: GBDevice, context: Context, points: List<ActivityPoint>) {
+        // Altitude from imported elevation tiles replaces what the device recorded, and so does
+        // the elevation gained read from the summary below
+        if (ElevationTiles.correct(context, device, ActivityKind.fromCode(workout.activityKind), points)) {
+            parseSummaryData(workout.summaryData)?.let { summaryData ->
+                ElevationTiles.applyToSummary(summaryData, points)
+                workout.summaryData = summaryData.toString()
+            }
+        }
+    }
+
+    internal fun processDetailedWorkout(
         workout: BaseActivitySummary,
         activityPoints: List<ActivityPoint>,
+        sets: List<ActivityTrack.SetInfo>,
         workoutStartInstant: Instant,
         workoutEndInstant: Instant,
         startOffset: ZoneOffset,
@@ -373,6 +390,13 @@ internal object RecordedWorkoutSyncer {
             null
         }
 
+        val exerciseSegments = WorkoutSyncerUtils.buildExerciseSegments(
+            sets,
+            workoutStartInstant,
+            workoutEndInstant,
+            exerciseType
+        )
+
         recordsToInsert.add(
             ExerciseSessionRecord(
                 startTime = workoutStartInstant,
@@ -381,6 +405,7 @@ internal object RecordedWorkoutSyncer {
                 endZoneOffset = endOffset,
                 exerciseType = exerciseType,
                 title = workout.name ?: activityKind.getLabel(context),
+                segments = exerciseSegments,
                 exerciseRoute = exerciseRoute,
                 metadata = WorkoutSyncerUtils.workoutRecordMetadata(
                     metadata,
@@ -490,9 +515,10 @@ internal object RecordedWorkoutSyncer {
         }
     }
 
-    private fun processAggregateWorkout(
+    internal fun processAggregateWorkout(
         gbDevice: GBDevice,
         workout: BaseActivitySummary,
+        sets: List<ActivityTrack.SetInfo>,
         workoutStartInstant: Instant,
         workoutEndInstant: Instant,
         startOffset: ZoneOffset,
@@ -515,6 +541,12 @@ internal object RecordedWorkoutSyncer {
                 endZoneOffset = endOffset,
                 exerciseType = exerciseType,
                 title = workout.name ?: activityKind.getLabel(context),
+                segments = WorkoutSyncerUtils.buildExerciseSegments(
+                    sets,
+                    workoutStartInstant,
+                    workoutEndInstant,
+                    exerciseType
+                ),
                 metadata = WorkoutSyncerUtils.workoutRecordMetadata(
                     metadata,
                     WorkoutSyncerUtils.RECORD_TYPE_SESSION,
@@ -953,7 +985,7 @@ internal object RecordedWorkoutSyncer {
         // Try dedicated active_calories field first, fall back to caloriesBurnt
         val activeCaloriesPermission = HealthPermission.getWritePermission(ActiveCaloriesBurnedRecord::class)
         if (activeCaloriesPermission in grantedPermissions) {
-            var activeCalories = summaryData.getNumber(ActivitySummaryEntries.CALORIES_BURNT, 0.0).toDouble()
+            val activeCalories = summaryData.getNumber(ActivitySummaryEntries.CALORIES_BURNT, 0.0).toDouble()
 
             if (activeCalories > 0) {
                 recordsToInsert.add(
@@ -979,15 +1011,17 @@ internal object RecordedWorkoutSyncer {
             LOG.debug("Permission for ActiveCaloriesBurnedRecord not granted for device '{}'.", deviceName)
         }
 
-        // Only sync TotalCaloriesBurnedRecord if we have both active AND resting calories
+        // Only sync TotalCaloriesBurnedRecord if we either (1) have the total calories reported by the device
+        // or (2) have both active AND resting calories
         // Otherwise, syncing the same value as both active and total would be misleading
         val totalCaloriesPermission = HealthPermission.getWritePermission(TotalCaloriesBurnedRecord::class)
         if (totalCaloriesPermission in grantedPermissions) {
             val activeCalories = summaryData.getNumber(ActivitySummaryEntries.CALORIES_BURNT, 0.0).toDouble()
             val restingCalories = summaryData.getNumber(ActivitySummaryEntries.CALORIES_RESTING, 0.0).toDouble()
+            val reportedTotalCalories = summaryData.getNumber(ActivitySummaryEntries.CALORIES_TOTAL, 0.0).toDouble()
 
-            if (activeCalories > 0 && restingCalories > 0) {
-                val totalCalories = activeCalories + restingCalories
+            if (reportedTotalCalories > 0 || (activeCalories > 0 && restingCalories > 0)) {
+                val totalCalories = if (reportedTotalCalories > 0) reportedTotalCalories else activeCalories + restingCalories
                 recordsToInsert.add(
                     TotalCaloriesBurnedRecord(
                         startTime = startTime,
@@ -1003,8 +1037,12 @@ internal object RecordedWorkoutSyncer {
                         )
                     )
                 )
-                LOG.debug("Added TotalCaloriesBurnedRecord ({} kcal = {} active + {} resting) for workout at {} for device '{}'.",
-                    totalCalories, activeCalories, restingCalories, startTime, deviceName)
+                LOG.debug(
+                    "Added TotalCaloriesBurnedRecord ({} kcal) for workout at {} for device '{}'.",
+                    totalCalories,
+                    startTime,
+                    deviceName
+                )
             } else {
                 LOG.debug("Not syncing TotalCaloriesBurnedRecord - need both active and resting calories (have: active={}, resting={}) for device '{}'",
                     activeCalories, restingCalories, deviceName)

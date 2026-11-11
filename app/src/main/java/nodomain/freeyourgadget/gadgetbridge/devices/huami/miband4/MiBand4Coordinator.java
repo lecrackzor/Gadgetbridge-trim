@@ -78,6 +78,11 @@ public class MiBand4Coordinator extends HuamiCoordinator {
     }
 
     @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public DeviceSpecificSettings getDeviceSpecificSettings(final GBDevice device) {
         final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
 
@@ -165,8 +170,8 @@ public class MiBand4Coordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return MiBand4Support.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new MiBand4Support();
     }
 
     @Override

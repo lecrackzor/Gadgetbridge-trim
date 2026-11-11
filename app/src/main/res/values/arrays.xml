@@ -4,6 +4,37 @@
         <!-- empty array -->
     </string-array>
 
+    <string-array name="magic_touch_jj02_mode_entries">
+        <item>@string/magic_touch_jj02_mode_gentle</item>
+        <item>@string/magic_touch_jj02_mode_relax</item>
+        <item>@string/magic_touch_jj02_mode_stress_relief</item>
+        <item>@string/magic_touch_jj02_mode_custom</item>
+    </string-array>
+    <string-array name="magic_touch_jj02_mode_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+    <string-array name="magic_touch_jj02_heat_level_entries">
+        <item>40°C</item>
+        <item>45°C</item>
+    </string-array>
+    <string-array name="magic_touch_jj02_heat_level_values">
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="magic_touch_jj02_head_init_entries">
+        <item>Reserve</item>
+        <item>Normal</item>
+        <item>More better</item>
+    </string-array>
+    <string-array name="magic_touch_jj02_head_init_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
     <string-array name="http_methods">
         <item>GET</item>
         <item>POST</item>
@@ -3141,6 +3172,18 @@
         <item>0</item>
     </string-array>
 
+    <string-array name="prefs_spo2_monitoring_mode">
+        <item>@string/spo2_off</item>
+        <item>@string/spo2_mode_sleep</item>
+        <item>@string/spo2_mode_all_day</item>
+    </string-array>
+
+    <string-array name="prefs_spo2_monitoring_mode_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
     <string-array name="prefs_zetime_heartrate_measurement_interval">
         <item name="0">@string/off</item>
         <item name="300">@string/interval_five_minutes</item>
@@ -3213,6 +3256,102 @@
         <item>255</item>
     </string-array>
 
+    <string-array name="pref_casio_ggb100_connection_duration">
+        <item>@string/minutes_3</item>
+        <item>@string/minutes_5</item>
+        <item>@string/minutes_10</item>
+    </string-array>
+
+    <string-array name="pref_casio_ggb100_connection_duration_values">
+        <item>3</item>
+        <item>5</item>
+        <item>10</item>
+    </string-array>
+
+    <string-array name="pref_casio_altitude_interval">
+        <item>@string/seconds_5</item>
+        <item>@string/minutes_2</item>
+    </string-array>
+
+    <string-array name="pref_casio_altitude_interval_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="pref_casio_altimeter_display">
+        <item>@string/pref_casio_altimeter_display_plain</item>
+        <item>@string/pref_casio_altimeter_display_100</item>
+        <item>@string/pref_casio_altimeter_display_1000</item>
+    </string-array>
+
+    <string-array name="pref_casio_altimeter_display_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <string-array name="pref_casio_mode_carousel">
+        <item>@string/pref_casio_mode_carousel_barometer</item>
+        <item>@string/pref_casio_mode_carousel_temperature</item>
+        <item>@string/pref_casio_mode_carousel_data_recall</item>
+        <item>@string/pref_casio_mode_carousel_sunrise_sunset</item>
+        <item>@string/pref_casio_mode_carousel_stopwatch</item>
+        <item>@string/pref_casio_mode_carousel_timer</item>
+        <item>@string/pref_casio_mode_carousel_alarm</item>
+        <item>@string/pref_casio_mode_carousel_world_time</item>
+    </string-array>
+
+    <string-array name="pref_casio_mode_carousel_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_casio_mode_carousel_default">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_casio_display_screens">
+        <item>@string/pref_casio_display_screens_day_date</item>
+        <item>@string/pref_casio_display_screens_pressure_graph_date</item>
+        <item>@string/pref_casio_display_screens_hours_min_sec</item>
+        <item>@string/pref_casio_display_screens_steps_today</item>
+        <item>@string/pref_casio_display_screens_year_date</item>
+        <item>@string/pref_casio_display_screens_pressure_graph</item>
+        <item>@string/pref_casio_display_screens_world_time</item>
+        <item>@string/pref_casio_display_screens_sunrise_sunset_today</item>
+    </string-array>
+
+    <string-array name="pref_casio_display_screens_values">
+        <item>1</item>
+        <item>3</item>
+        <item>5</item>
+        <item>7</item>
+        <item>2</item>
+        <item>4</item>
+        <item>6</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_casio_display_screens_default">
+        <item>1</item>
+        <item>3</item>
+        <item>5</item>
+        <item>7</item>
+    </string-array>
+
     <string-array name="notifications_timeout">
         <item>@string/no_limit</item>
         <item>@string/seconds_5</item>
@@ -3275,17 +3414,6 @@
         <item>@string/reminder_every_week</item>
         <item>@string/reminder_every_month</item>
         <item>@string/reminder_every_year</item>
-    </string-array>
-
-    <string-array name="notification_filter_modes_entries">
-        <item>@string/filter_mode_none</item>
-        <item>@string/filter_mode_whitelist</item>
-        <item>@string/filter_mode_blacklist</item>
-    </string-array>
-
-    <string-array name="notification_filter_submodes_entries">
-        <item>@string/filter_submode_at_least_one</item>
-        <item>@string/filter_submode_all</item>
     </string-array>
 
     <!-- Note: ZeTime preferences -->
@@ -3512,90 +3640,6 @@
         <item>60</item>
     </string-array>
 
-    <string-array name="pref_charts_tabs_items">
-        <item>@string/workout_tab_overview</item>
-        <item>@string/activity_sleepchart_activity_and_sleep</item>
-        <item>@string/charts_activity_list</item>
-        <item>@string/sleepchart_your_sleep</item>
-        <item>@string/weekstepschart_steps_a_week_or_month</item>
-        <item>@string/pref_header_hrv_status</item>
-        <item>@string/body_energy</item>
-        <item>@string/menuitem_vo2_max</item>
-        <item>@string/pref_header_training_load</item>
-        <item>@string/menuitem_race_predictor</item>
-        <item>@string/metric_garmin_training_readiness</item>
-        <item>@string/menuitem_solar_charging</item>
-        <item>@string/generic_metrics</item>
-        <item>@string/menuitem_hr</item>
-        <item>@string/menuitem_stress</item>
-        <item>@string/menuitem_pai</item>
-        <item>@string/stats_title</item>
-        <item>@string/liveactivity_live_activity</item>
-        <item>@string/pref_header_spo2</item>
-        <item>@string/menuitem_temperature</item>
-        <item>@string/menuitem_weight</item>
-        <item>@string/watchface_widget_type_calories</item>
-        <item>@string/pref_header_hydration</item>
-        <item>@string/respiratoryrate</item>
-        <item>@string/blood_pressure</item>
-    </string-array>
-
-    <string-array name="pref_charts_tabs_values">
-        <item>@string/p_overview</item>
-        <item>@string/p_activity</item>
-        <item>@string/p_activity_list</item>
-        <item>@string/p_sleep</item>
-        <item>@string/p_steps_week</item>
-        <item>@string/p_hrv_status</item>
-        <item>@string/p_body_energy</item>
-        <item>@string/p_vo2max</item>
-        <item>@string/p_load</item>
-        <item>@string/p_raceprediction</item>
-        <item>@string/p_trainingreadiness</item>
-        <item>@string/p_solar_charging</item>
-        <item>@string/p_generic_metrics</item>
-        <item>@string/p_heartrate</item>
-        <item>@string/p_stress</item>
-        <item>@string/p_pai</item>
-        <item>@string/p_speed_zones</item>
-        <item>@string/p_live_stats</item>
-        <item>@string/p_spo2</item>
-        <item>@string/p_temperature</item>
-        <item>@string/p_weight</item>
-        <item>@string/p_calories</item>
-        <item>@string/p_hydration</item>
-        <item>@string/p_respiratory_rate</item>
-        <item>@string/p_bloodpressure</item>
-    </string-array>
-
-    <string-array name="pref_charts_tabs_items_default">
-        <item>@string/p_cycling</item>
-        <item>@string/p_activity</item>
-        <item>@string/p_activity_list</item>
-        <item>@string/p_sleep</item>
-        <item>@string/p_hrv_status</item>
-        <item>@string/p_body_energy</item>
-        <item>@string/p_vo2max</item>
-        <item>@string/p_load</item>
-        <item>@string/p_raceprediction</item>
-        <item>@string/p_trainingreadiness</item>
-        <item>@string/p_solar_charging</item>
-        <item>@string/p_generic_metrics</item>
-        <item>@string/p_heartrate</item>
-        <item>@string/p_steps_week</item>
-        <item>@string/p_stress</item>
-        <item>@string/p_pai</item>
-        <item>@string/p_speed_zones</item>
-        <item>@string/p_live_stats</item>
-        <item>@string/p_spo2</item>
-        <item>@string/p_temperature</item>
-        <item>@string/p_weight</item>
-        <item>@string/p_calories</item>
-        <item>@string/p_hydration</item>
-        <item>@string/p_respiratory_rate</item>
-        <item>@string/p_bloodpressure</item>
-    </string-array>
-
     <string-array name="pref_amazfitneo_sounds">
         <item>@string/prefs_operating_sounds</item>
         <item>@string/pref_title_notifications_call</item>
@@ -3650,16 +3694,6 @@
         <item>1</item>
         <item>2</item>
         <item>3</item>
-    </string-array>
-
-    <string-array name="notification_list_is_blacklist_names">
-        <item>@string/pref_title_notification_use_as_deny</item>
-        <item>@string/pref_title_notification_use_as_allow</item>
-    </string-array>
-
-    <string-array name="notification_list_is_blacklist_values">
-        <item>true</item>
-        <item>false</item>
     </string-array>
 
     <string-array name="galaxy_eqalizer_modes">
@@ -4148,32 +4182,6 @@
         <item>outdoor</item>
     </string-array>
 
-    <string-array name="soundcore_sport_x20_equalizer_preset_names">
-        <item>@string/soundcore_equalizer_preset_signature</item>
-        <item>@string/soundcore_equalizer_preset_acoustic</item>
-        <item>@string/sony_equalizer_preset_bass_boost</item>
-        <item>@string/soundcore_equalizer_preset_bass_reducer</item>
-        <item>@string/nothing_equalizer_classical</item>
-        <item>@string/soundcore_equalizer_preset_podcast</item>
-        <item>@string/soundcore_equalizer_preset_dance</item>
-        <item>@string/soundcore_equalizer_preset_deep</item>
-        <item>@string/nothing_equalizer_electronic</item>
-        <item>@string/soundcore_equalizer_preset_flat</item>
-        <item>@string/soundcore_equalizer_preset_hip_hop</item>
-        <item>@string/soundcore_equalizer_preset_jazz</item>
-        <item>@string/soundcore_equalizer_preset_latin</item>
-        <item>@string/soundcore_equalizer_preset_lounge</item>
-        <item>@string/soundcore_equalizer_preset_piano</item>
-        <item>@string/nothing_equalizer_pop</item>
-        <item>@string/soundcore_equalizer_preset_rnb</item>
-        <item>@string/nothing_equalizer_rock</item>
-        <item>@string/soundcore_equalizer_preset_small_speakers</item>
-        <item>@string/soundcore_equalizer_preset_spoken_word</item>
-        <item>@string/sony_equalizer_preset_treble_boost</item>
-        <item>@string/soundcore_equalizer_preset_treble_reducer</item>
-        <item>@string/custom</item>
-    </string-array>
-
     <string-array name="haylou_s35_anc_audio_mode_names">
         <item>@string/off</item>
         <item>@string/prefs_active_noise_cancelling</item>
@@ -4541,6 +4549,22 @@
     <string-array name="pref_chart_sleep_day_chart_values">
         <item>hypnogram</item>
         <item>legacy</item>
+    </string-array>
+    <string-array name="pref_chart_heartrate_color_entries">
+        <item>@string/pref_chart_heartrate_color_orange</item>
+        <item>@string/pref_chart_heartrate_color_red</item>
+    </string-array>
+    <string-array name="pref_chart_heartrate_color_values">
+        <item>orange</item>
+        <item>red</item>
+    </string-array>
+    <string-array name="pref_charts_range_entries">
+        <item>@string/calendar_week</item>
+        <item>@string/calendar_month</item>
+    </string-array>
+    <string-array name="pref_charts_range_values">
+        <item>week</item>
+        <item>month</item>
     </string-array>
     <string-array name="sleep_range_entries">
         <item>@string/pref_chart_sleep_range_rolling_24h</item>
@@ -5045,4 +5069,25 @@
         <item>bmr</item>
         <item>impedance</item>
     </string-array>
+
+    <string-array name="pref_main_screens_items">
+        <item>@string/bottom_nav_dashboard</item>
+        <item>@string/bottom_nav_workouts</item>
+        <item>@string/bottom_nav_devices</item>
+    </string-array>
+    <string-array name="pref_main_screens_items_values">
+        <item>dashboard</item>
+        <item>workouts</item>
+        <item>devices</item>
+    </string-array>
+
+    <string-array name="prefs_pebble_app_stores">
+        <item>@string/prefs_pebble_appstore_rebble</item>
+        <item>@string/prefs_pebble_appstore_repebble</item>
+    </string-array>
+    <string-array name="prefs_pebble_app_stores_values">
+        <item>rebble</item>
+        <item>repebble</item>
+    </string-array>
+
 </resources>

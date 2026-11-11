@@ -76,6 +76,11 @@ public class MiBand3Coordinator extends HuamiCoordinator {
         return true;
     }
 
+    @Override
+    public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
+        return true;
+    }
+
     public static String getNightMode(final String deviceAddress) {
         Prefs prefs = new Prefs(GBApplication.getDeviceSpecificSharedPrefs(deviceAddress));
 
@@ -155,8 +160,8 @@ public class MiBand3Coordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return MiBand3Support.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new MiBand3Support();
     }
 
     @Override

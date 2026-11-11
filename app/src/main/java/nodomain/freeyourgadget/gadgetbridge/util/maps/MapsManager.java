@@ -18,6 +18,8 @@ package nodomain.freeyourgadget.gadgetbridge.util.maps;
 
 import android.content.Context;
 
+import androidx.annotation.Nullable;
+
 import org.mapsforge.core.graphics.Paint;
 import org.mapsforge.core.graphics.Style;
 import org.mapsforge.core.model.BoundingBox;
@@ -163,7 +165,6 @@ public final class MapsManager {
         final double minLat = latitudeAccumulator.getMin();
         final double maxLon = longitudeAccumulator.getMax();
         final double minLon = longitudeAccumulator.getMin();
-        final LatLong center = new LatLong(minLat + (maxLat - minLat) / 2, minLon + (maxLon - minLon) / 2);
 
         final List<LatLong> points = trackPoints.stream()
                 .map(p -> new LatLong(p.getLatitude(), p.getLongitude()))
@@ -181,15 +182,47 @@ public final class MapsManager {
         }
         polyline.setPoints(points);
 
-        mapView.setCenter(center);
+        setBoundingBox(minimalBoundingBox(minLat, minLon, maxLat, maxLon));
+    }
+
+    /**
+     * Moves the view to fit the bounding box.
+     */
+    public void setBoundingBox(final BoundingBox boundingBox) {
+        mapView.setCenter(boundingBox.getCenterPoint());
 
         final byte zoom = LatLongUtils.zoomForBounds(
                 new Dimension(mapView.getWidth(), mapView.getHeight()),
-                minimalBoundingBox(minLat, minLon, maxLat, maxLon),
+                boundingBox,
                 mapView.getModel().displayModel.getTileSize()
         );
         mapView.setZoomLevel(zoom);
 
+        addTileRendererLayer();
+    }
+
+    /**
+     * Moves the view to the center at the zoom level.
+     */
+    public void setCenter(final LatLong center, final byte zoom) {
+        mapView.setCenter(center);
+        mapView.setZoomLevel(zoom);
+
+        addTileRendererLayer();
+    }
+
+    /**
+     * Returns the area that the loaded map files cover, or null if no map file is loaded.
+     */
+    @Nullable
+    public BoundingBox getMapBounds() {
+        if (!isMapLoaded || tileRendererLayer == null) {
+            return null;
+        }
+        return tileRendererLayer.getMapDataStore().boundingBox();
+    }
+
+    private void addTileRendererLayer() {
         if (!tileRenderedAdded) {
             mapView.getLayerManager().getLayers().add(0, tileRendererLayer);
             tileRenderedAdded = true;

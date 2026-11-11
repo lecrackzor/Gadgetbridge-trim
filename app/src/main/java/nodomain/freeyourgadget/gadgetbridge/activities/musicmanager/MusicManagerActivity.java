@@ -63,7 +63,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.install.FwAppInstallerActivity;
-import nodomain.freeyourgadget.gadgetbridge.activities.wififtp.WifiFtpSessionScreen;
+import nodomain.freeyourgadget.gadgetbridge.activities.wifi.WifiSessionScreen;
 import nodomain.freeyourgadget.gadgetbridge.adapter.MusicListAdapter;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceMusic;
@@ -109,7 +109,7 @@ public class MusicManagerActivity extends AbstractGBActivity {
     private boolean deleteSupported = true;
     private String[] uploadMimeTypes = {"audio/*"};
 
-    private WifiFtpSessionScreen wifiFtpSessionScreen;
+    private WifiSessionScreen wifiSessionScreen;
     
     public GBDevice getGBDevice() {
         return mGBDevice;
@@ -139,7 +139,7 @@ public class MusicManagerActivity extends AbstractGBActivity {
             throw new IllegalArgumentException("Must provide a device when invoking this activity");
         }
 
-        wifiFtpSessionScreen = new WifiFtpSessionScreen(this, mGBDevice);
+        wifiSessionScreen = new WifiSessionScreen(this, mGBDevice);
 
         fabMusicUpload = findViewById(R.id.fab_music_upload);
         assert fabMusicUpload != null;
@@ -150,7 +150,7 @@ public class MusicManagerActivity extends AbstractGBActivity {
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType(uploadMimeTypes.length == 1 ? uploadMimeTypes[0] : "audio/*");
                 intent.putExtra(Intent.EXTRA_MIME_TYPES, uploadMimeTypes);
-                wifiFtpSessionScreen.holdForPicker();
+                wifiSessionScreen.holdForPicker();
                 openAudioActivityResultLauncher.launch(intent);
             }
         });
@@ -373,7 +373,7 @@ public class MusicManagerActivity extends AbstractGBActivity {
 
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, filter);
 
-        wifiFtpSessionScreen.runWhenReady(() -> {
+        wifiSessionScreen.runWhenReady(() -> {
             // Load music data without timeout
             startLoading(0);
             GBApplication.deviceService(mGBDevice).onMusicListReq();
@@ -391,7 +391,7 @@ public class MusicManagerActivity extends AbstractGBActivity {
             new ActivityResultCallback<ActivityResult>() {
                 @Override
                 public void onActivityResult(ActivityResult result) {
-                    wifiFtpSessionScreen.releasePickerHold();
+                    wifiSessionScreen.releasePickerHold();
                     if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
                         Intent startIntent = new Intent(MusicManagerActivity.this, FwAppInstallerActivity.class);
                         startIntent.putExtra(GBDevice.EXTRA_DEVICE, mGBDevice);

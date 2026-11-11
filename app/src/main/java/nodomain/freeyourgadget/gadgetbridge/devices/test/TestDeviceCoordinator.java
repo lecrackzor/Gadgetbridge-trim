@@ -36,9 +36,7 @@ import java.util.Set;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFormat;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
@@ -51,6 +49,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.Vo2MaxSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl;
 import nodomain.freeyourgadget.gadgetbridge.devices.roidmi.RoidmiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.activity.TestActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.activity.TestActivityTrackProvider;
@@ -95,7 +94,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample;
 import nodomain.freeyourgadget.gadgetbridge.model.MetricSample;
 import nodomain.freeyourgadget.gadgetbridge.model.PaiSample;
 import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample;
-import nodomain.freeyourgadget.gadgetbridge.model.RestingMetabolicRateSample;
 import nodomain.freeyourgadget.gadgetbridge.model.SleepScoreSample;
 import nodomain.freeyourgadget.gadgetbridge.model.SolarChargeSample;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
@@ -124,8 +122,8 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return TestDeviceSupport.class;
+    public DeviceSupport createDeviceSupport(@NonNull final GBDevice device) {
+        return new TestDeviceSupport();
     }
 
     @Override
@@ -281,6 +279,9 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
             metrics.add(MetricSample.Metric.GARMIN_TRAINING_READINESS);
             metrics.add(MetricSample.Metric.GARMIN_RECOVERY_TIME);
         }
+        if (supportsTrainingStatus(device)) {
+            metrics.add(MetricSample.Metric.GARMIN_TRAINING_STATUS);
+        }
         return metrics;
     }
 
@@ -337,7 +338,7 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsFlashing(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.FLASHING);
+        return supports(device, TestFeature.FLASHING);
     }
 
     @Nullable
@@ -350,6 +351,11 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     @Override
     public boolean supportsScreenshots(@NonNull final GBDevice device) {
         return supports(device, TestFeature.SCREENSHOTS);
+    }
+
+    @Override
+    public boolean supportsGallery(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.GALLERY);
     }
 
     @Override
@@ -376,7 +382,7 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public String getSmartWakeupDescription(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SMART_WAKEUP_DESCRIPTION)
+        return supports(device, TestFeature.SMART_WAKEUP_DESCRIPTION)
             ? "Test device smart wake up description."
             : super.getSmartWakeupDescription(device);
     }
@@ -436,37 +442,37 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsActivityTracking(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ACTIVITY_TRACKING);
+        return supports(device, TestFeature.ACTIVITY_TRACKING);
     }
 
     @Override
     public boolean supportsSleepMeasurement(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SLEEP_MEASUREMENT);
+        return supports(device, TestFeature.SLEEP_MEASUREMENT);
     }
 
     @Override
     public boolean supportsStepCounter(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.STEP_COUNTER);
+        return supports(device, TestFeature.STEP_COUNTER);
     }
 
     @Override
     public boolean supportsSpeedzones(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SPEEDZONES);
+        return supports(device, TestFeature.SPEEDZONES);
     }
 
     @Override
     public boolean supportsCharts(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.CHARTS);
+        return supports(device, TestFeature.CHARTS);
     }
 
     @Override
     public boolean supportsTemperatureMeasurement(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.TEMPERATURE_MEASUREMENT);
+        return supports(device, TestFeature.TEMPERATURE_MEASUREMENT);
     }
 
     @Override
     public boolean supportsContinuousTemperature(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.CONTINUOUS_TEMPERATURE);
+        return supports(device, TestFeature.CONTINUOUS_TEMPERATURE);
     }
 
     @Override
@@ -476,12 +482,12 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsStressMeasurement(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.STRESS_MEASUREMENT);
+        return supports(device, TestFeature.STRESS_MEASUREMENT);
     }
 
     @Override
     public boolean supportsBodyEnergy(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.BODY_ENERGY);
+        return supports(device, TestFeature.BODY_ENERGY);
     }
 
     @Override
@@ -491,97 +497,102 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsSpo2(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SPO2);
+        return supports(device, TestFeature.SPO2);
     }
 
     @Override
     public boolean supportsHeartRateStats(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.HEART_RATE_STATS);
+        return supports(device, TestFeature.HEART_RATE_STATS);
     }
 
     @Override
     public boolean supportsHeartRateRestingMeasurement(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.HEART_RATE_RESTING);
+        return supports(device, TestFeature.HEART_RATE_RESTING);
     }
 
     @Override
     public boolean supportsBloodPressureMeasurement(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.BLOOD_PRESSURE);
+        return supports(device, TestFeature.BLOOD_PRESSURE);
     }
 
     @Override
     public boolean supportsWeightMeasurement(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.WEIGHT);
+        return supports(device, TestFeature.WEIGHT);
     }
 
     @Override
     public boolean supportsSleepScore(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SLEEP_SCORE);
+        return supports(device, TestFeature.SLEEP_SCORE);
     }
 
     @Override
     public boolean supportsAwakeSleep(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.AWAKE_SLEEP);
+        return supports(device, TestFeature.AWAKE_SLEEP);
     }
 
     @Override
     public boolean supportsCyclingData(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.CYCLING_DATA);
+        return supports(device, TestFeature.CYCLING_DATA);
     }
 
     @Override
     public boolean supportsSolarCharging(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SOLAR_CHARGING);
+        return supports(device, TestFeature.SOLAR_CHARGING);
     }
 
     @Override
     public boolean supportsTrainingLoad(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.TRAINING_LOAD);
+        return supports(device, TestFeature.TRAINING_LOAD);
     }
 
     @Override
     public boolean supportsTrainingLoadChronic(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.TRAINING_LOAD_CHRONIC);
+        return supports(device, TestFeature.TRAINING_LOAD_CHRONIC);
     }
 
     @Override
     public boolean supportsRacePrediction(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.RACE_PREDICTION);
+        return supports(device, TestFeature.RACE_PREDICTION);
     }
 
     @Override
     public boolean supportsTrainingReadiness(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.TRAINING_READINESS);
+        return supports(device, TestFeature.TRAINING_READINESS);
+    }
+
+    @Override
+    public boolean supportsTrainingStatus(@NonNull GBDevice device) {
+        return supports(getTestDevice(), TestFeature.TRAINING_STATUS);
     }
 
     @Override
     public boolean supportsHydration(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.HYDRATION);
+        return supports(device, TestFeature.HYDRATION);
     }
 
     @Override
     public boolean supportsVO2Max(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.VO2_MAX);
+        return supports(device, TestFeature.VO2_MAX);
     }
 
     @Override
     public boolean supportsVO2MultiSport(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.VO2_MULTISPORT);
+        return supports(device, TestFeature.VO2_MULTISPORT);
     }
 
     @Override
     public boolean supportsActiveCalories(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ACTIVE_CALORIES);
+        return supports(device, TestFeature.ACTIVE_CALORIES);
     }
 
     @Override
     public boolean supportsActivityDistance(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ACTIVITY_DISTANCE);
+        return supports(device, TestFeature.ACTIVITY_DISTANCE);
     }
 
     @Override
     public boolean supportsPai(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.PAI);
+        return supports(device, TestFeature.PAI);
     }
 
     @Override
@@ -591,62 +602,62 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsPaiLow(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.PAI_LOW);
+        return supports(device, TestFeature.PAI_LOW);
     }
 
     @Override
     public boolean supportsPaiTime(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.PAI_TIME);
+        return supports(device, TestFeature.PAI_TIME);
     }
 
     @Override
     public boolean supportsRespiratoryRate(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.RESPIRATORY_RATE);
+        return supports(device, TestFeature.RESPIRATORY_RATE);
     }
 
     @Override
     public boolean supportsSleepRespiratoryRate(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.SLEEP_RESPIRATORY_RATE);
+        return supports(device, TestFeature.SLEEP_RESPIRATORY_RATE);
     }
 
     @Override
     public boolean supportsDayRespiratoryRate(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.DAY_RESPIRATORY_RATE);
+        return supports(device, TestFeature.DAY_RESPIRATORY_RATE);
     }
 
     @Override
     public boolean supportsAlarmSnoozing(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_SNOOZING);
+        return supports(device, TestFeature.ALARM_SNOOZING);
     }
 
     @Override
     public boolean supportsAlarmTitle(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_TITLE);
+        return supports(device, TestFeature.ALARM_TITLE);
     }
 
     @Override
     public int getAlarmTitleLimit(final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_TITLE_LIMIT) ? 10 : -1;
+        return supports(device, TestFeature.ALARM_TITLE_LIMIT) ? 10 : -1;
     }
 
     @Override
     public boolean supportsAlarmDescription(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_DESCRIPTION);
+        return supports(device, TestFeature.ALARM_DESCRIPTION);
     }
 
     @Override
     public boolean supportsAlarmSounds(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_SOUNDS);
+        return supports(device, TestFeature.ALARM_SOUNDS);
     }
 
     @Override
     public boolean supportsAlarmBacklight(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_BACKLIGHT);
+        return supports(device, TestFeature.ALARM_BACKLIGHT);
     }
 
     @Override
     public boolean supportsAlarmTitlePresets(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.ALARM_TITLE_PRESETS);
+        return supports(device, TestFeature.ALARM_TITLE_PRESETS);
     }
 
     @Override
@@ -656,12 +667,12 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsMusicInfo(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.MUSIC_INFO);
+        return supports(device, TestFeature.MUSIC_INFO);
     }
 
     @Override
     public boolean supportsLedColor(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.LED_COLOR);
+        return supports(device, TestFeature.LED_COLOR);
     }
 
     @Override
@@ -672,12 +683,12 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public int getReminderSlotCount(final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.REMINDERS) ? 3 : 0;
+        return supports(device, TestFeature.REMINDERS) ? 3 : 0;
     }
 
     @Override
     public int getCannedRepliesSlotCount(final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.CANNED_REPLIES) ? 3 : 0;
+        return supports(device, TestFeature.CANNED_REPLIES) ? 3 : 0;
     }
 
     @Override
@@ -693,17 +704,17 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsDisabledWorldClocks(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.DISABLED_WORLD_CLOCKS);
+        return supports(device, TestFeature.DISABLED_WORLD_CLOCKS);
     }
 
     @Override
     public int getContactsSlotCount(final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.CONTACTS) ? 3 : 0;
+        return supports(device, TestFeature.CONTACTS) ? 3 : 0;
     }
 
     @Override
     public boolean supportsRgbLedColor(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.RGB_LED_COLOR);
+        return supports(device, TestFeature.RGB_LED_COLOR);
     }
 
     @NonNull
@@ -714,22 +725,22 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsHeartRateMeasurement(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.HEART_RATE_MEASUREMENT);
+        return supports(device, TestFeature.HEART_RATE_MEASUREMENT);
     }
 
     @Override
     public boolean supportsManualHeartRateMeasurement(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.MANUAL_HEART_RATE_MEASUREMENT);
+        return supports(device, TestFeature.MANUAL_HEART_RATE_MEASUREMENT);
     }
 
     @Override
     public boolean supportsRealtimeData(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.REALTIME_DATA);
+        return supports(device, TestFeature.REALTIME_DATA);
     }
 
     @Override
     public boolean supportsRemSleep(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.REM_SLEEP);
+        return supports(device, TestFeature.REM_SLEEP);
     }
 
     @Override
@@ -739,12 +750,12 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsFindDevice(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.FIND_DEVICE);
+        return supports(device, TestFeature.FIND_DEVICE);
     }
 
     @Override
     public boolean supportsUnicodeEmojis(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.UNICODE_EMOJIS);
+        return supports(device, TestFeature.UNICODE_EMOJIS);
     }
 
     @Override
@@ -752,37 +763,15 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
         return super.getSupportedDeviceSpecificConnectionSettings();
     }
 
+    @Nullable
     @Override
-    public DeviceSpecificSettings getDeviceSpecificSettings(final GBDevice device) {
-        final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
-
-        deviceSpecificSettings.addRootScreen(R.xml.devicesettings_loyalty_cards);
-
-        if (getWorldClocksSlotCount() > 0) {
-            final List<Integer> dateTime = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.DATE_TIME);
-            dateTime.add(R.xml.devicesettings_world_clocks);
-        }
-
-        if (getContactsSlotCount(device) > 0) {
-            deviceSpecificSettings.addRootScreen(R.xml.devicesettings_contacts);
-        }
-
-        deviceSpecificSettings.addRootScreen(R.xml.devicesettings_test_features);
-
-        final List<Integer> developer = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.DEVELOPER);
-        developer.add(R.xml.devicesettings_developer_add_test_activities);
-
-        return deviceSpecificSettings;
+    public DeviceSettingsSpec getDeviceSettings(@NonNull final GBDevice device) {
+        return TestDeviceSettingsKt.testDeviceSettings(device, this);
     }
 
     @Override
     public int[] getSupportedDeviceSpecificAuthenticationSettings() {
         return new int[]{R.xml.devicesettings_pairingkey};
-    }
-
-    @Override
-    public DeviceSpecificSettingsCustomizer getDeviceSpecificSettingsCustomizer(final GBDevice device) {
-        return new TestDeviceSpecificSettingsCustomizer();
     }
 
     @Override
@@ -819,7 +808,7 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public int getBatteryCount(final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.BATTERIES_MULTIPLE) ? 3 : 1;
+        return supports(device, TestFeature.BATTERIES_MULTIPLE) ? 3 : 1;
     }
 
     @Override
@@ -839,7 +828,7 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsPowerOff(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.POWER_OFF);
+        return supports(device, TestFeature.POWER_OFF);
     }
 
     @Override
@@ -854,13 +843,48 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsWidgets(@NonNull final GBDevice device) {
-        return supports(getTestDevice(), TestFeature.WIDGETS);
+        return supports(device, TestFeature.WIDGETS);
     }
 
     @Nullable
     @Override
     public WidgetManager getWidgetManager(final GBDevice device) {
         return super.getWidgetManager(device);
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.APP_NOTIFICATIONS);
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.PHONE_CALLS);
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.CALL_CONTROL);
+    }
+
+    @Override
+    public boolean supportsInternetAccess(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.INTERNET_ACCESS);
+    }
+
+    @Override
+    public boolean supportsSmsReply(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.SMS_REPLY);
+    }
+
+    @Override
+    public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.PHONE_SILENT_MODE);
+    }
+
+    @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.GPS_SHARING);
     }
 
     @Override
@@ -881,17 +905,17 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public boolean supportsNotificationVibrationPatterns(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.NOTIFICATION_VIBRATION_PATTERNS);
+        return supports(device, TestFeature.NOTIFICATION_VIBRATION_PATTERNS);
     }
 
     @Override
     public boolean supportsNotificationVibrationRepetitionPatterns(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.NOTIFICATION_VIBRATION_REPETITION_PATTERNS);
+        return supports(device, TestFeature.NOTIFICATION_VIBRATION_REPETITION_PATTERNS);
     }
 
     @Override
     public boolean supportsNotificationLedPatterns(@NonNull GBDevice device) {
-        return supports(getTestDevice(), TestFeature.NOTIFICATION_LED_PATTERNS);
+        return supports(device, TestFeature.NOTIFICATION_LED_PATTERNS);
     }
 
     @Override
@@ -933,15 +957,17 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     }
 
     @Nullable
+    @Deprecated
     private GBDevice getTestDevice() {
         // HACK: Avoid the refactor of adding a device as a parameter on all functions
         // This means that it's only possible to have a single test device
 
-        if (GBApplication.app() == null || GBApplication.app().getDeviceManager() == null) {
+        final GBApplication app = GBApplication.appOrNull();
+        if (app == null) {
             return null;
         }
 
-        final List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
+        final List<GBDevice> devices = app.getDeviceManager().getDevices();
         for (GBDevice device : devices) {
             if (DeviceType.TEST == device.getType()) {
                 return device;
@@ -953,6 +979,14 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     protected static Prefs getPrefs(final GBDevice device) {
         return new Prefs(GBApplication.getDeviceSpecificSharedPrefs(device.getAddress()));
+    }
+
+    @Override
+    public List<QuickControl> getQuickControls(@NonNull final GBDevice device) {
+        if (!supports(device, TestFeature.QUICK_CONTROLS)) {
+            return Collections.emptyList();
+        }
+        return TestDeviceQuickControlsKt.testDeviceQuickControls();
     }
 
     @Override

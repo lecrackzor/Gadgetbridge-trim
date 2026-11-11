@@ -73,10 +73,20 @@ public class TeclastH30Coordinator extends AbstractBLEDeviceCoordinator {
         return true;
     }
 
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return TeclastH30Support.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new TeclastH30Support();
     }
 
     @Override

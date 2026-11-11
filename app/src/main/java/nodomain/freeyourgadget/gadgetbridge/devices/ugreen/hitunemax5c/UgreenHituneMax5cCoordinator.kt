@@ -33,8 +33,8 @@ open class UgreenHituneMax5cCoordinator : AbstractBLClassicDeviceCoordinator() {
 
     override fun getManufacturer(): String = "UGREEN"
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return UgreenHituneMax5cSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return UgreenHituneMax5cSupport()
     }
 
     override fun getDeviceNameResource(): Int {
@@ -143,6 +143,12 @@ open class UgreenHituneMax5cCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getCustomActions(): List<DeviceCardAction> {
         return listOf(DEVICE_CARD_ACTION_ANC, DEVICE_CARD_ACTION_EQ)
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 
     companion object {
         private val DEVICE_CARD_ACTION_ANC = deviceCardAction {

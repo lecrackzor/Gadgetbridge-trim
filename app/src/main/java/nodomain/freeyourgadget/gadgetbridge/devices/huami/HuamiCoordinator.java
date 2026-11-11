@@ -31,14 +31,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
-import de.greenrobot.dao.AbstractDao;
-import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
@@ -69,22 +65,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandService;
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.VibrationProfile;
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
-import nodomain.freeyourgadget.gadgetbridge.entities.AudioRecordingDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.DeviceMusicFileDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiExtendedActivitySampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiHeartRateManualSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiHeartRateMaxSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiHeartRateRestingSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiPaiSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiSleepRespiratoryRateSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiSleepSessionSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiSpo2SampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.HuamiStressSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.MiBandActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
@@ -118,27 +99,6 @@ public abstract class HuamiCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public String getAuthHelp() {
         return "https://gadgetbridge.org/basics/pairing/huami-xiaomi-server/";
-    }
-
-    @Override
-    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        return new HashMap<>() {{
-            put(session.getMiBandActivitySampleDao(), MiBandActivitySampleDao.Properties.DeviceId);
-            put(session.getHuamiExtendedActivitySampleDao(), HuamiExtendedActivitySampleDao.Properties.DeviceId);
-            put(session.getHuamiStressSampleDao(), HuamiStressSampleDao.Properties.DeviceId);
-            put(session.getHuamiSpo2SampleDao(), HuamiSpo2SampleDao.Properties.DeviceId);
-            put(session.getHuamiHeartRateManualSampleDao(), HuamiHeartRateManualSampleDao.Properties.DeviceId);
-            put(session.getHuamiHeartRateMaxSampleDao(), HuamiHeartRateMaxSampleDao.Properties.DeviceId);
-            put(session.getHuamiHeartRateRestingSampleDao(), HuamiHeartRateRestingSampleDao.Properties.DeviceId);
-            put(session.getHuamiPaiSampleDao(), HuamiPaiSampleDao.Properties.DeviceId);
-            put(session.getHuamiSleepRespiratoryRateSampleDao(), HuamiSleepRespiratoryRateSampleDao.Properties.DeviceId);
-            put(session.getGenericHrvValueSampleDao(), GenericHrvValueSampleDao.Properties.DeviceId);
-            put(session.getGenericTemperatureSampleDao(), GenericTemperatureSampleDao.Properties.DeviceId);
-            put(session.getHuamiSleepSessionSampleDao(), HuamiSleepSessionSampleDao.Properties.DeviceId);
-            put(session.getBaseActivitySummaryDao(), BaseActivitySummaryDao.Properties.DeviceId);
-            put(session.getAudioRecordingDao(), AudioRecordingDao.Properties.DeviceId);
-            put(session.getDeviceMusicFileDao(), DeviceMusicFileDao.Properties.DeviceId);
-        }};
     }
 
     @Override
@@ -273,7 +233,7 @@ public abstract class HuamiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new HuamiActivitySummaryParser();
+        return new HuamiActivitySummaryParser(device);
     }
 
     @Override
@@ -563,6 +523,21 @@ public abstract class HuamiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsCalendarEvents(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
         return true;
     }
 

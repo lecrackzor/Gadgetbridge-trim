@@ -33,6 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AxisSensor;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorBatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutOpenReply;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutOpenWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatsPhone;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatsWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatch;
@@ -73,6 +74,9 @@ public final class XiaomiSleepAsAndroidManager {
     // Nothing on the band closes the synthetic workout by itself. Past this age a stored start
     // belongs to no session anybody is still waiting on.
     private static final long SESSION_MAX_AGE_MS = 12 * 60 * 60_000L;
+    // How long a workout that survived a connection is left for Sleep as Android to claim. It
+    // repeats START_TRACKING as its own watchdog roughly once a minute.
+    private static final long RECOVERY_GRACE_MS = 120_000L;
     // Reported to the band until a real reading arrives.
     private static final int HEART_RATE_UNKNOWN = 255;
 
@@ -84,7 +88,8 @@ public final class XiaomiSleepAsAndroidManager {
     // Covers the whole session: the gap between closing a stale workout and opening the new one,
     // and the gap between the closing pause and the closing finish. The band echoes its workout
     // status without a sport id, so this is the only way to tell those echoes apart from a workout
-    // started on the band itself.
+    // started on the band itself. It survives a reconnect, because the band keeps the workout open
+    // across one and goes on echoing it.
     private volatile boolean sessionRequested = false;
     private volatile boolean heartRateRequested = false;
     private volatile long workoutStartedMs = 0;
@@ -115,15 +120,45 @@ public final class XiaomiSleepAsAndroidManager {
     }
 
     /**
-     * Forget the session along with every timer driving it, all of which belong to the connection
-     * that started them.
+     * Stop every timer driving the session, all of which belong to the connection that started
+     * them. The session itself is kept: the band holds the workout across a reconnect and goes on
+     * echoing it.
      */
     void reset() {
         workoutStatusHandler.removeCallbacksAndMessages(null);
         stopKeepalive();
         stopWorkoutStatsTicker();
         rawSensorActive = false;
-        sessionRequested = false;
+    }
+
+    /**
+     * Deal with a synthetic workout the band kept open across a connect.
+     * <p>
+     * The band holds the workout on its own and goes on asking the phone to confirm it, so an
+     * interrupted session leaves it running with nothing driving it: the keepalive, the stats
+     * ticker and the raw stream all belong to the connection that went away. The session is kept
+     * recognised while Sleep as Android is given the chance to claim it, which its repeated
+     * START_TRACKING does by rebuilding all three. A workout nobody claims belongs to a session
+     * that ended while the link was down, and only closing it gets the band off its workout screen.
+     */
+    void recover() {
+        reset();
+        if (!sessionStartedRecently()) {
+            forgetSession();
+            return;
+        }
+
+        sessionRequested = true;
+        workoutStatusHandler.postDelayed(this::closeUnclaimedSession, RECOVERY_GRACE_MS);
+    }
+
+    private void closeUnclaimedSession() {
+        if (rawSensorActive) {
+            return;
+        }
+
+        LOG.info("Closing the synthetic workout left open by an earlier connection");
+        stop();
     }
 
     /**
@@ -384,6 +419,35 @@ public final class XiaomiSleepAsAndroidManager {
      */
     boolean ownsWorkoutOpen() {
         return sessionRequested;
+    }
+
+    /**
+     * Whether a workout open request the session does not own is still for a synthetic workout,
+     * left on the band by a session nothing on this side is tracking any more.
+     */
+    boolean isOrphanedWorkoutOpen(final WorkoutOpenWatch workoutOpenWatch) {
+        return !sessionRequested && workoutOpenWatch.getSport() == SYNTHETIC_SPORT;
+    }
+
+    /**
+     * Refuse a synthetic workout that belongs to no session. Refusing is how the band is told to
+     * close it; acknowledging would keep it streaming for the rest of the day.
+     */
+    void refuseWorkoutOpen() {
+        LOG.warn("Refusing a synthetic workout that belongs to no session");
+        health.getSupport().sendCommand(
+                "saa orphan open refuse",
+                XiaomiProto.Command.newBuilder()
+                        .setType(XiaomiHealthService.COMMAND_TYPE)
+                        .setSubtype(XiaomiHealthService.CMD_WORKOUT_WATCH_OPEN)
+                        .setHealth(Health.newBuilder().setWorkoutOpenReply(
+                                WorkoutOpenReply.newBuilder()
+                                        .setCode(XiaomiHealthService.WORKOUT_OPEN_NO_PERMISSION)
+                                        .setSelectedVersion(XiaomiHealthService.WORKOUT_PROTOCOL_VERSION)
+                                        .setGpsAccuracy(XiaomiHealthService.GPS_ACCURACY_UNKNOWN)
+                        ))
+                        .build()
+        );
     }
 
     /**

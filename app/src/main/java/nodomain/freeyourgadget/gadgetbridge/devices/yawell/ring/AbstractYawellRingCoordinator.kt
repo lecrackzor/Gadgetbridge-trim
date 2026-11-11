@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring
 
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
@@ -37,13 +35,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.samples.ColmiActivitySampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.ColmiActivitySample
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiActivitySampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHrvValueSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepSessionSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSleepStageSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiSpo2SampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.ColmiStressSampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.HrvSummarySample
@@ -55,35 +46,12 @@ import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.yawell.ring.YawellRingDeviceSupport
 
 abstract class AbstractYawellRingCoordinator : AbstractBLEDeviceCoordinator() {
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>?, Property?> {
-        return object : HashMap<AbstractDao<*, *>?, Property?>() {
-            init {
-                put(session.colmiActivitySampleDao, ColmiActivitySampleDao.Properties.DeviceId)
-                put(
-                    session.colmiHeartRateSampleDao,
-                    ColmiHeartRateSampleDao.Properties.DeviceId
-                )
-                put(session.colmiSpo2SampleDao, ColmiSpo2SampleDao.Properties.DeviceId)
-                put(session.colmiStressSampleDao, ColmiStressSampleDao.Properties.DeviceId)
-                put(
-                    session.colmiSleepSessionSampleDao,
-                    ColmiSleepSessionSampleDao.Properties.DeviceId
-                )
-                put(
-                    session.colmiSleepStageSampleDao,
-                    ColmiSleepStageSampleDao.Properties.DeviceId
-                )
-                put(session.colmiHrvValueSampleDao, ColmiHrvValueSampleDao.Properties.DeviceId)
-            }
-        }
-    }
-
     override fun getManufacturer(): String? {
         return "Colmi"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return YawellRingDeviceSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return YawellRingDeviceSupport()
     }
 
     override fun getDefaultIconResource(): Int {
@@ -147,6 +115,18 @@ abstract class AbstractYawellRingCoordinator : AbstractBLEDeviceCoordinator() {
     }
 
     open fun hasDisplay(): Boolean {
+        return false
+    }
+
+    open fun hasButton(device: GBDevice): Boolean {
+        return false
+    }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean {
+        return false
+    }
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean {
         return false
     }
 
@@ -221,6 +201,12 @@ abstract class AbstractYawellRingCoordinator : AbstractBLEDeviceCoordinator() {
     }
 
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
+        if (hasButton(device)) {
+            xmlScreen(
+                screen = DeviceSpecificSettingsScreen.GENERIC,
+                subScreens = intArrayOf(R.xml.devicesettings_buttonactions),
+            )
+        }
         screen(
             key = DeviceSpecificSettingsScreen.HEALTH.key,
             title = R.string.pref_header_health,
@@ -256,6 +242,21 @@ abstract class AbstractYawellRingCoordinator : AbstractBLEDeviceCoordinator() {
                 icon = R.drawable.ic_temperature,
                 defaultValue = false,
                 visibleWhen = { supportsContinuousTemperature(device) },
+            )
+        }
+        screen(
+            key = DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.key,
+            title = R.string.pref_header_calls_and_notifications,
+            icon = R.drawable.ic_notifications,
+            visibleWhen = { supportsAppNotifications(device) },
+        ) {
+            seekbar(
+                key = YawellRingConstants.PREF_NOTIFICATION_VIBRATION_COUNT,
+                title = R.string.pref_header_vibration_count,
+                icon = R.drawable.ic_vibration,
+                min = 1,
+                max = 5,
+                defaultValue = 3,
             )
         }
         screen(

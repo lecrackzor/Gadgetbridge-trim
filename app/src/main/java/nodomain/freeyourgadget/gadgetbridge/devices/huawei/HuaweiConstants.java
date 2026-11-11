@@ -76,6 +76,7 @@ public final class HuaweiConstants {
     public static final String HU_BAND2PRO_NAME = "huawei band 2 pro-";
     public static final String HU_BAND3PRO_NAME = "huawei band 3 pro-";
     public static final String HU_BAND4PRO_NAME = "huawei band 4 pro-";
+    public static final String HU_BANDA2_NAME = "huawei band a2-";
     public static final String HU_WATCHGT2_NAME = "huawei watch gt 2-";
     public static final String HU_WATCHGT2E_NAME = "huawei watch gt 2e-";
     public static final String HU_WATCHGT2PRO_NAME = "huawei watch gt 2 pro-";
@@ -87,6 +88,7 @@ public final class HuaweiConstants {
     public static final String HU_BAND11_NAME = "huawei band 11-";
     public static final String HU_BAND11PRO_NAME = "huawei band 11 pro-";
     public static final String HU_WATCHD2_NAME = "huawei watch d2-";
+    public static final String HU_WATCHD3_NAME = "huawei watch d3-";
     public static final String HU_WATCHGT3_NAME = "huawei watch gt 3-";
     public static final String HU_WATCHGT3SE_NAME = "huawei watch gt 3 se-";
     public static final String HU_WATCHGT3PRO_NAME = "huawei watch gt 3 pro-";
@@ -100,6 +102,8 @@ public final class HuaweiConstants {
     public static final String HU_WATCHGT5PRO_NAME = "huawei watch gt 5 pro-";
     public static final String HU_WATCHGT6_NAME = "huawei watch gt 6-";
     public static final String HU_WATCHGT6PRO_NAME = "huawei watch gt 6 pro-";
+    public static final String HU_WATCHGT7_NAME = "huawei watch gt 7-";
+    public static final String HU_WATCHGT7PRO_NAME = "huawei watch gt 7 pro-";
     public static final String HU_WATCHFIT_NAME = "huawei watch fit-";
     public static final String HU_WATCHFIT2_NAME = "huawei watch fit 2-";
     public static final String HU_WATCHFIT3_NAME = "huawei watch fit 3-";

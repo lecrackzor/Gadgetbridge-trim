@@ -1,6 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.devicesettings
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
@@ -13,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.DrawableRes
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.widget.ImageViewCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -27,9 +29,11 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.adapter.DeviceCardItemBinder
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardEntry
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardLayout
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.MoreCardItem
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.dialogs.IconListAdapter
@@ -38,11 +42,12 @@ import java.util.Collections
 
 class DeviceCardItemsActivity : AbstractGBActivity() {
     private lateinit var device: GBDevice
+    private lateinit var layout: DeviceCardLayout
     private lateinit var adapter: ItemAdapter
     private lateinit var fab: FloatingActionButton
-    private var defaults: List<DeviceCardItem> = emptyList()
-    private var items: MutableList<DeviceCardItem> = mutableListOf()
-    private var removed: MutableList<DeviceCardItem> = mutableListOf()
+    private var defaults: List<DeviceCardEntry> = emptyList()
+    private var items: MutableList<DeviceCardEntry> = mutableListOf()
+    private var removed: MutableList<DeviceCardEntry> = mutableListOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +59,14 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
             return
         }
         device = intentDevice
-        defaults = device.deviceCoordinator.getCardItems(device)
+        layout = DeviceCardLayout.valueOf(intent.getStringExtra(EXTRA_LAYOUT) ?: DeviceCardLayout.ITEMS.name)
+        defaults = when (layout) {
+            DeviceCardLayout.ITEMS -> device.deviceCoordinator.getCardItems(device)
+            DeviceCardLayout.QUICK_CONTROLS -> device.deviceCoordinator.getQuickControls(device)
+        }
+        if (layout == DeviceCardLayout.QUICK_CONTROLS) {
+            setTitle(R.string.pref_device_card_quick_controls_title)
+        }
 
         adapter = ItemAdapter()
         val recyclerView = findViewById<RecyclerView>(R.id.dashboard_widgets_list)
@@ -95,8 +107,8 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
         fab.contentDescription = getString(R.string.device_card_add_item)
         fab.setOnClickListener { showAddItemDialog() }
 
-        items = DeviceCardLayout.apply(device, defaults).toMutableList()
-        removed = DeviceCardLayout.removed(device, defaults).toMutableList()
+        items = layout.apply(device, defaults).toMutableList()
+        removed = layout.removed(device, defaults).toMutableList()
         refresh()
     }
 
@@ -128,21 +140,26 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
     private fun showResetDialog() {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.eightbitdo_keymap_reset_title)
-            .setMessage(R.string.device_card_items_reset_confirmation)
+            .setMessage(
+                when (layout) {
+                    DeviceCardLayout.ITEMS -> R.string.device_card_items_reset_confirmation
+                    DeviceCardLayout.QUICK_CONTROLS -> R.string.device_card_quick_controls_reset_confirmation
+                }
+            )
             .setPositiveButton(R.string.reset) { _, _ -> reset() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun reset() {
-        DeviceCardLayout.reset(device)
-        items = DeviceCardLayout.apply(device, defaults).toMutableList()
-        removed = DeviceCardLayout.removed(device, defaults).toMutableList()
+        layout.reset(device)
+        items = layout.apply(device, defaults).toMutableList()
+        removed = layout.removed(device, defaults).toMutableList()
         refresh()
     }
 
     private fun save() {
-        DeviceCardLayout.save(device, items, removed)
+        layout.save(device, items, removed)
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -155,10 +172,7 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
         val collator = Collator.getInstance()
         val entries = removed
             .map {
-                it to IconListAdapter.Entry(
-                    DeviceCardItemBinder.icon(it, device),
-                    DeviceCardItemBinder.title(it, device, this)
-                )
+                it to IconListAdapter.Entry(icon(it), title(it, this))
             }
             .sortedWith { a, b -> collator.compare(a.second.title, b.second.title) }
         MaterialAlertDialogBuilder(this)
@@ -173,14 +187,25 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
             .show()
     }
 
-    private fun remove(item: DeviceCardItem) {
+    @DrawableRes
+    private fun icon(entry: DeviceCardEntry): Int = when (entry) {
+        is DeviceCardItem -> DeviceCardItemBinder.icon(entry, device)
+        is QuickControl -> entry.icon
+    }
+
+    private fun title(entry: DeviceCardEntry, context: Context): String = when (entry) {
+        is DeviceCardItem -> DeviceCardItemBinder.title(entry, device, context)
+        is QuickControl -> context.getString(entry.title)
+    }
+
+    private fun remove(item: DeviceCardEntry) {
         items.remove(item)
         removed.add(item)
         save()
         refresh()
     }
 
-    private fun showOverflowMenu(anchor: View, item: DeviceCardItem) {
+    private fun showOverflowMenu(anchor: View, item: DeviceCardEntry) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, MENU_REMOVE, 0, R.string.widgets_remove)
         popup.setOnMenuItemClickListener { menuItem ->
@@ -216,12 +241,12 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
         @SuppressLint("ClickableViewAccessibility")
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
-            holder.icon.setImageResource(DeviceCardItemBinder.icon(item, device))
+            holder.icon.setImageResource(icon(item))
             ImageViewCompat.setImageTintList(
                 holder.icon,
                 ColorStateList.valueOf(MaterialColors.getColor(holder.icon, R.attr.textColorSecondary))
             )
-            holder.title.text = DeviceCardItemBinder.title(item, device, holder.itemView.context)
+            holder.title.text = title(item, holder.itemView.context)
             if (item == MoreCardItem) {
                 holder.summary.setText(R.string.device_card_more_summary)
                 holder.summary.visibility = View.VISIBLE
@@ -240,5 +265,14 @@ class DeviceCardItemsActivity : AbstractGBActivity() {
 
     companion object {
         private const val MENU_REMOVE = 1
+        private const val EXTRA_LAYOUT = "layout"
+
+        @JvmStatic
+        fun start(context: Context, device: GBDevice, layout: DeviceCardLayout) {
+            val intent = Intent(context, DeviceCardItemsActivity::class.java)
+            intent.putExtra(GBDevice.EXTRA_DEVICE, device)
+            intent.putExtra(EXTRA_LAYOUT, layout.name)
+            context.startActivity(intent)
+        }
     }
 }

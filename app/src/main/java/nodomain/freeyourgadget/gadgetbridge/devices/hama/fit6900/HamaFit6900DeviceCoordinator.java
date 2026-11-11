@@ -51,6 +51,21 @@ public class HamaFit6900DeviceCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public int[] getSupportedDeviceSpecificSettings(GBDevice device) {
         return new int[]{
                 R.xml.devicesettings_allow_reject_calls, // reject only
@@ -86,8 +101,8 @@ public class HamaFit6900DeviceCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return HamaFit6900DeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new HamaFit6900DeviceSupport();
     }
 
     @Override

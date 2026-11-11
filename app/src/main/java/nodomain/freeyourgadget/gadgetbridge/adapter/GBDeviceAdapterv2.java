@@ -34,6 +34,7 @@ import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -99,6 +100,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.ActivityGauge;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.activities.permissions.DevicePermissionsActivity;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -108,7 +110,6 @@ import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceFolder;
-import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
@@ -122,6 +123,10 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
  */
 public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.ViewHolder> {
     private static final Logger LOG = LoggerFactory.getLogger(GBDeviceAdapterv2.class);
+
+    private static final String STATE_EXPANDED_DEVICE = "devices_expanded_device";
+    private static final String STATE_EXPANDED_FOLDER = "devices_expanded_folder";
+    private static final String STATE_REVEALED_CARD_ITEMS = "devices_revealed_card_items";
 
     private final Context context;
     private final GaugeDrawer gaugeDrawer = new GaugeDrawer();
@@ -143,6 +148,23 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         this.deviceActivityMap = deviceMap;
     }
 
+    public void saveInstanceState(final Bundle outState) {
+        outState.putString(STATE_EXPANDED_DEVICE, expandedDeviceAddress);
+        outState.putString(STATE_EXPANDED_FOLDER, expandedFolderName);
+        outState.putStringArrayList(STATE_REVEALED_CARD_ITEMS, new ArrayList<>(revealedCardItemsAddresses));
+    }
+
+    public void restoreInstanceState(final Bundle savedInstanceState) {
+        expandedDeviceAddress = savedInstanceState.getString(STATE_EXPANDED_DEVICE, "");
+        expandedFolderName = savedInstanceState.getString(STATE_EXPANDED_FOLDER, "");
+        revealedCardItemsAddresses.clear();
+        final ArrayList<String> revealed = savedInstanceState.getStringArrayList(STATE_REVEALED_CARD_ITEMS);
+        if (revealed != null) {
+            revealedCardItemsAddresses.addAll(revealed);
+        }
+        rebuildFolders();
+    }
+
     public void rebuildFolders() {
         this.devicesListWithFolders = enrichDeviceListWithFolder(deviceList);
     }
@@ -150,7 +172,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
     @SuppressLint("NotifyDataSetChanged")
     public final void refreshSingleDevice(final GBDevice device) {
         final int i = devicesListWithFolders.indexOf(device);
-        if (i > 0) {
+        if (i >= 0) {
             notifyItemChanged(i);
         } else {
             // Somehow the device was not on the list - rebuild everything
@@ -220,7 +242,9 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         holder.container.setVisibility(View.VISIBLE);
         holder.deviceNameLabel.setText(folder.getName());
         holder.infoIcons.setVisibility(View.GONE);
+        holder.quickControls.setVisibility(View.GONE);
         holder.companionHint.setVisibility(View.GONE);
+        holder.permissionsHint.setVisibility(View.GONE);
         holder.deviceImageView.setOnLongClickListener(null);
         holder.deviceInfoBox.setVisibility(View.GONE);
         holder.cardViewActivityCardLayout.setVisibility(View.GONE);
@@ -349,20 +373,27 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         //dynamically from the coordinator's declared card items, see DeviceCardItemBinder
         String hrSampleText = null;
         if (parent.getContext() instanceof ControlCenterv2) {
-            ActivitySample sample = ((ControlCenterv2) parent.getContext()).getCurrentHRSample(device);
-            if (sample != null) {
-                hrSampleText = String.valueOf(sample.getHeartRate());
+            Integer heartRate = ((ControlCenterv2) parent.getContext()).getCurrentHeartRate(device);
+            if (heartRate != null) {
+                hrSampleText = String.valueOf(heartRate);
             }
         }
         DeviceCardItemBinder.bind(
             holder.infoIcons,
-            DeviceCardLayout.apply(device, coordinator.getCardItems(device)),
+            DeviceCardLayout.ITEMS.apply(device, coordinator.getCardItems(device)),
             device,
             context,
             hrSampleText
         );
+        QuickControlBinder.bind(
+            holder.quickControls,
+            DeviceCardLayout.QUICK_CONTROLS.apply(device, coordinator.getQuickControls(device)),
+            device,
+            context
+        );
 
         bindCompanionHint(holder, device);
+        bindPermissionsHint(holder, device);
 
         ItemWithDetailsAdapter infoAdapter = new ItemWithDetailsAdapter(context, device.getDeviceInfos());
         infoAdapter.setHorizontalAlignment(true);
@@ -383,6 +414,12 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
                 notifyItemChanged(holder.getBindingAdapterPosition());
             });
         }
+        // The card items have a bottom margin. When they are hidden, we need to add a margin to the quick controls.
+        final ViewGroup.MarginLayoutParams quickControlsParams = (ViewGroup.MarginLayoutParams) holder.quickControls.getLayoutParams();
+        quickControlsParams.topMargin = holder.infoIcons.getVisibility() == View.VISIBLE
+            ? 0
+            : context.getResources().getDimensionPixelSize(R.dimen.quick_control_spacing);
+        holder.quickControls.setLayoutParams(quickControlsParams);
         holder.deviceImageView.setOnLongClickListener(v -> {
             DeviceSettingsActivity.start(context, device);
             return true;
@@ -426,7 +463,27 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         });
     }
 
+    private void bindPermissionsHint(final ViewHolder holder, final GBDevice device) {
+        // One hint at a time, and the companion association can remove a missing permission
+        if (holder.companionHint.getVisibility() == View.VISIBLE || !PermissionsHint.shouldShow(context, device)) {
+            holder.permissionsHint.setVisibility(View.GONE);
+            return;
+        }
+        holder.permissionsHint.setVisibility(View.VISIBLE);
+        holder.permissionsHintDismiss.setOnClickListener(v -> {
+            PermissionsHint.dismiss(context, device);
+            notifyItemChanged(holder.getBindingAdapterPosition());
+        });
+        holder.permissionsHintGrant.setOnClickListener(v ->
+            context.startActivity(DevicePermissionsActivity.newIntent(context, device))
+        );
+    }
+
     public void onResume() {
+        // Re-check missing permissions
+        PermissionsHint.invalidate();
+        notifyItemRangeChanged(0, getItemCount());
+
         if (pendingCompanionAddress == null) {
             return;
         }
@@ -798,9 +855,15 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         // dynamically into this container by DeviceCardItemBinder.
         FlexboxLayout infoIcons;
 
+        LinearLayout quickControls;
+
         final LinearLayout companionHint;
         final Button companionHintDismiss;
         final Button companionHintPair;
+
+        final LinearLayout permissionsHint;
+        final Button permissionsHintDismiss;
+        final Button permissionsHintGrant;
 
         ImageView deviceInfoView;
         //overflow
@@ -832,10 +895,15 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
             //overflow
             deviceInfoList = view.findViewById(R.id.device_item_infos);
             infoIcons = view.findViewById(R.id.device_info_icons);
+            quickControls = view.findViewById(R.id.device_quick_controls);
 
             companionHint = view.findViewById(R.id.companion_hint);
             companionHintDismiss = view.findViewById(R.id.companion_hint_dismiss);
             companionHintPair = view.findViewById(R.id.companion_hint_pair);
+
+            permissionsHint = view.findViewById(R.id.permissions_hint);
+            permissionsHintDismiss = view.findViewById(R.id.permissions_hint_dismiss);
+            permissionsHintGrant = view.findViewById(R.id.permissions_hint_grant);
 
             cardViewActivityCardLayout = view.findViewById(R.id.card_view_activity_card_layout);
 

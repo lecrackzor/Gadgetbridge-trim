@@ -78,7 +78,7 @@ public class HeartRateProfile<T extends AbstractBTLESingleDeviceSupport> extends
 
     @Override
     public boolean onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
-        if (!GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
+        if (!GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.uuid.equals(characteristic.getUuid())) {
             return false;
         }
 

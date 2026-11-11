@@ -29,7 +29,6 @@ import java.util.function.Predicate;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.ChecksumCalculator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminSupport;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.v2.CommunicatorV2;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminJson;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminJsonException;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;

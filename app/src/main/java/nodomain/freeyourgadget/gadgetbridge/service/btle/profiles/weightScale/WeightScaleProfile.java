@@ -88,7 +88,7 @@ public class WeightScaleProfile<T extends AbstractBTLESingleDeviceSupport> exten
 
     private boolean process(BluetoothGattCharacteristic characteristic, byte[] value) {
         UUID uuid = characteristic.getUuid();
-        if (GattCharacteristic.CHARACTERISTIC_WEIGHT_MEASUREMENT.equals(uuid)) {
+        if (GattCharacteristic.CHARACTERISTIC_WEIGHT_MEASUREMENT.uuid.equals(uuid)) {
             return processWeightMeasurement(value);
         }
         return false;

@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.SimpleItemAnimator
 import kotlinx.coroutines.launch
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
-import nodomain.freeyourgadget.gadgetbridge.activities.wififtp.WifiFtpSessionScreen
+import nodomain.freeyourgadget.gadgetbridge.activities.wifi.WifiSessionScreen
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityInstallSessionBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.install.InstallManager
@@ -65,7 +65,7 @@ class InstallSessionActivity : AbstractGBActivity() {
             finish()
             return
         }
-        WifiFtpSessionScreen(this, device)
+        WifiSessionScreen(this, device)
 
         val session = viewModel.session
         if (session == null) {

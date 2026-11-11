@@ -30,6 +30,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceRand
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
 import nodomain.freeyourgadget.gadgetbridge.service.AbstractBluetoothDeviceSupport
+import nodomain.freeyourgadget.gadgetbridge.service.gallery.GallerySourceRegistry
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.notifications.GBProgressNotification
 import org.slf4j.Logger
@@ -40,6 +41,7 @@ import java.util.GregorianCalendar
 open class TestDeviceSupport : AbstractBluetoothDeviceSupport() {
     private lateinit var progressNotification: GBProgressNotification
     private val handler = Handler(Looper.getMainLooper())
+    private var gallerySource: TestGallerySource? = null
 
     override fun setContext(gbDevice: GBDevice, btAdapter: BluetoothAdapter, context: Context) {
         super.setContext(gbDevice, btAdapter, context)
@@ -71,6 +73,12 @@ open class TestDeviceSupport : AbstractBluetoothDeviceSupport() {
 
             sendBatteryLevels()
 
+            if (this.coordinator.supportsGallery(device)) {
+                val source = TestGallerySource(context, device)
+                gallerySource = source
+                GallerySourceRegistry.register(device.address, source)
+            }
+
             // TODO hr measurements
             // TODO app list
             // TODO screenshots
@@ -100,6 +108,8 @@ open class TestDeviceSupport : AbstractBluetoothDeviceSupport() {
 
     override fun dispose() {
         handler.removeCallbacksAndMessages(null)
+        gallerySource?.let { GallerySourceRegistry.unregister(device.address, it) }
+        gallerySource = null
     }
 
     override fun useAutoConnect(): Boolean {

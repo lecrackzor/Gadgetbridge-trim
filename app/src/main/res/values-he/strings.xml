@@ -160,9 +160,7 @@
     <string name="discovery_stop_scanning">להפסיק את הסריקה</string>
     <string name="discovery_start_scanning">להתחיל בגילוי</string>
     <string name="action_discover">חיבור התקן חדש</string>
-    <string name="device_with_rssi">%1$s‏ (%2$s)</string>
     <string name="title_activity_android_pairing">צימוד התקן</string>
-    <string name="android_pairing_hint">יש להשתמש בדו־שיח צימוד ה־Bluetooth לאנדרואיד כדי ליצור צימוד להתקן.</string>
     <string name="title_activity_mi_band_pairing">צימוד ה־Mi Band שלך</string>
     <string name="pairing">מתבצע צימוד עם %s…</string>
     <string name="pairing_creating_bond_with">נוצר איגוד עם %1$s‏ (%2$s)</string>
@@ -210,7 +208,6 @@
     <string name="pref_screen_notification_profile_generic_social">רשת חברתית</string>
     <string name="control_center_find_lost_device">איתור התקן שאבד</string>
     <string name="control_center_cancel_to_stop_vibration">יש לבטל כדי לעצור את הרטט.</string>
-    <string name="title_activity_charts">פעילות ושינה</string>
     <string name="title_activity_set_alarm">הגדרת שעון מעורר</string>
     <string name="controlcenter_start_configure_alarms">הגדרת שעון מעורר</string>
     <string name="title_activity_alarm_details">פרטי השעון המעורר</string>
@@ -577,17 +574,8 @@
     <string name="live_activity_max_heart_rate">דופק נוכחי / מרבי: %1$d ‏/ %2$d</string>
     <string name="debugactivity_really_factoryreset_title">לאפס להגדרות יצרן\?</string>
     <string name="debugactivity_really_factoryreset">איפוס להגדרות יצרן ימחק את כל הנתונים מההתקן המקושר (אם יש תמיכה בזה). מכשירים מבית Xiaomi/Huami גם משנים את כתובת החומרה (MAC), כך שבעיני Gadgetbridge הם נחשבים למכשירים חדשים.</string>
-    <string name="title_activity_notification_filter">מסנן התראות</string>
-    <string name="edittext_notification_filter_words_hint">נא להקליד את המילים המבוקשות, אחת בכל שורה</string>
-    <string name="toast_notification_filter_saved_successfully">מסנן ההתראות נשמר</string>
     <string name="filter_mode_none">לא לסנן</string>
-    <string name="filter_mode_whitelist">להציג כאשר המילים מופיעות</string>
-    <string name="filter_mode_blacklist">לחסום כאשר המילים מופיעות</string>
-    <string name="filter_submode_at_least_one">לפחות אחת מהמילים</string>
-    <string name="filter_submode_all">כל המילים</string>
-    <string name="toast_notification_filter_words_empty_hint">נא להקליד לפחות מילה אחת</string>
     <string name="filter_mode">מצב מסנן</string>
-    <string name="mode_configuration">תצורת מצב</string>
     <string name="save_configuration">שמירת תצורה</string>
     <string name="appwidget_not_connected">לא מחובר, לא הוגדר שעון מעורר.</string>
     <string name="activity_type_exercise">אימון</string>
@@ -667,8 +655,6 @@
     <string name="pref_header_charts">הגדרות תרשימים</string>
     <string name="pref_title_charts_average">הצגת ממוצעים בתרשימים</string>
     <string name="pref_title_charts_range">טווח התרשימים</string>
-    <string name="pref_charts_range_on">טווח התרשימים מוגדר לחודש</string>
-    <string name="pref_charts_range_off">טווח התרשימים מוגדר לשבוע</string>
     <string name="weekstepschart_steps_a_month">צעדים בחודש</string>
     <string name="weeksleepchart_sleep_a_month">שינה בחודש</string>
     <string name="menuitem_nfc">תקשורת קרבה</string>
@@ -683,7 +669,6 @@
     <string name="activity_DB_delete_legacy_button">מחיקת מסד נתונים ישן</string>
     <string name="activity_DB_empty_button">מסד נתונים ריק</string>
     <string name="activity_db_management_empty_DB">מסד נתונים ריק</string>
-    <string name="activity_db_management_exportimport_label">ייצוא וייבוא</string>
     <string name="activity_db_management_empty_db_warning">אזהרה! לחיצה על כפתור זה תוביל למחיקת כל הנתונים שלך והאיסוף יתחיל מההתחלה.</string>
     <string name="appwidget_sleep_alarm_widget_label">התראת שינה</string>
     <string name="widget_listing_label">מצב והתראות</string>
@@ -698,7 +683,7 @@
     <plurals name="widget_alarm_target_hours" tools:ignore="MissingQuantity">
         <item quantity="one">שעה</item>
         <item quantity="two">שעתיים</item>
-        <item quantity="other">%d שעות</item>
+        <item quantity="other">%1$d:%2$02d שעות</item>
     </plurals>
     <string name="activity_error_no_app_for_gpx">כדי לצפות בעקבות פעילות, עליך להתקין יישומון שיכול לטפל בקובצי GPX.</string>
     <string name="preferences_makibes_hr3_settings">הגדרות של Makibes HR3</string>
@@ -751,7 +736,6 @@
     <string name="prefs_button_variable_actions">הגדרות נרחבות ללחיצת כפתור</string>
     <string name="prefs_button_long_press_action_selection_title">פעולה ללחיצה ארוכה על הכפתור</string>
     <string name="alarm_snooze">נודניק</string>
-    <string name="error_no_location_access">יש להעניק גישה למיקום כדי שהסריקה תעבוד כראוי</string>
     <string name="pref_title_allow_high_mtu">לאפשר MTU גבוה</string>
     <string name="pref_summary_allow_high_mtu">מגביר את קצב ההעברה, יש מכשירי Android שלא תומכים בזה.</string>
     <string name="pref_summary_sync_calendar">הפעלת התראות לוח שנה, אפילו ללא חיבור</string>
@@ -824,12 +808,12 @@
     <string name="bip_prefs_shortcuts">קיצורי דרך</string>
     <string name="hr_widget_last_notification">התראה אחרונה</string>
     <string name="controlcenter_set_alias">הגדרת כינוי</string>
-    <string name="fw_upgrade_notice_amazfit_trex">פעולה זו תתקין את הקושחה %s ב־Amazfit T-Rex שלך. 
-\n 
-\nנא לוודא את התקנת קובץ ה־‎.fw בהתחלה, לאחר מכן את קובץ ה־‎.res ולבסוף קובץ ה־‎.gps השעון שלך יופעל מחדש לאחר התקנת קובץ ה־fw. 
-\n 
-\nלתשומת לבך: אין צורך בהתקנת קובצי ה־‎.res וה־‎.gps אם הם כבר זהים לאלו שהתקנת בעבר. 
-\n 
+    <string name="fw_upgrade_notice_amazfit_trex">פעולה זו תתקין את הקושחה %s ב־Amazfit T-Rex שלך.
+\n
+\nנא לוודא את התקנת קובץ ה־‎.fw בהתחלה, לאחר מכן את קובץ ה־‎.res ולבסוף קובץ ה־‎.gps השעון שלך יופעל מחדש לאחר התקנת קובץ ה־fw.
+\n
+\nלתשומת לבך: אין צורך בהתקנת קובצי ה־‎.res וה־‎.gps אם הם כבר זהים לאלו שהתקנת בעבר.
+\n
 \nהמשך התהליך הוא על אחריותך!</string>
     <string name="about_additional_contributions">תודתנו נתונה לכל התורמים שתרמו קוד, תרגומים, תמיכה, רעיונות, מוטיבציה, דיווחי תקלות, כסף… ✊</string>
     <string name="about_additional_device_support">תמיכה במכשירים נוספים</string>
@@ -840,7 +824,6 @@
     <string name="about_title">על אודות</string>
     <string name="pref_title_weather_summary">משמש לספק מזג האוויר של LineageOS, גרסאות אחרות של Android צריכות להשתמש ביישומונים כמו „התראות מזג אוויר”. אפשר למצוא מידע נוסף בוויקי של Gadgetbridge.</string>
     <string name="menuitem_worldclock">שעון עולמי</string>
-    <string name="permission_granting_mandatory">כל ההרשאות האלו נדרשות ואם לא תוענקנה היציבות תתערער</string>
     <string name="error_version_check_extreme_caution">אזהרה: בדיקת פרטי הגרסה נתקלה בשגיאה! עדיף שלא להמשיך! הגרסה שנצפתה היא %s</string>
     <string name="error_background_service_reason">התחלת שירות הרקע נכשלה עקב חריגה - נא ללחוץ כאן לפרטים נוספים. \n\nשגיאה:</string>
     <string name="error_background_service_reason_truncated">התחלת שירות הרקע נכשל עקב…</string>
@@ -1053,7 +1036,6 @@
 \nלתשומת לבך: אין צורך בהתקנת קובצי ה־‎.res וה־‎.gps אם הם כבר זהים לאלו שהתקנת בעבר.
 \n
 \nהמשך התהליך הוא על אחריותך!</string>
-    <string name="activity_DB_ShowContentButton">הצגת תוכן תיקיית ייבוא/ייצוא</string>
     <string name="activity_data_management_directory_content_title">ייצוא/ייבוא תוכן תיקייה</string>
     <string name="widget_settings_select_device_title">נא לבחור מכשיר</string>
     <string name="dbmanagementactivity_export_confirmation">לייצא נתונים\? נתוני הפעילות שיוצאו קודם לכן (אם יש כאלו) וההעדפות יידרסו.</string>
@@ -1217,18 +1199,11 @@
     <string name="nothing_prefs_inear_summary">נגינה/השהיה של המוזיקה בהתאם להרכבת אוזניות</string>
     <string name="nothing_prefs_inear_title">זיהוי תוך אוזני</string>
     <string name="nothing_prefs_audiomode_title">מצב שמע</string>
-    <string name="uncheck_all_applications">ביטול סימון כל היישומונים</string>
-    <string name="pref_title_notification_use_as_allow">לאפשר התראות מהיישומונים הנבחרים</string>
     <string name="title_activity_notification_management">הגדרות הודעה</string>
     <string name="pref_title_message_privacy_mode">מצב פרטיות הודעות</string>
     <string name="pref_header_notification_application_settings">הגדרות נפרדות לכל יישומון</string>
-    <string name="toast_app_must_not_be_selected">יישומון צריך להיות לא מסומן כדי שיוגדר</string>
-    <string name="toast_app_must_be_selected">יישומון חייב להיות מסומן כדי שיוגדר</string>
     <string name="pref_message_privacy_mode_complete">הסתרת כל התוכן</string>
     <string name="pref_applications_settings">רשימת יישומונים</string>
-    <string name="check_all_applications">סימון כל היישומונים</string>
-    <string name="pref_title_notification_use_as">להשתמש ברשימת היישומונים כדי…</string>
-    <string name="pref_title_notification_use_as_deny">לדחות התראות מהיישומונים הנבחרים</string>
     <string name="pref_message_privacy_mode_off">הצגת כל התוכן</string>
     <string name="prefs_ambient_voice_summary">הדגשת הקול משאר הצלילים</string>
     <string name="prefs_equalizer_preset">ערכה של אקוולייזר</string>
@@ -1530,8 +1505,8 @@
     <string name="pref_ambient_sound_tone_summary">מרך לצלול</string>
     <string name="pref_balance">איזון</string>
     <string name="pref_switch_controls_anc_ambient">ביטול רעש →← הקפי</string>
-    <string name="pref_switch_controls_anc_off">ביטול רעש →← כבוי</string>
-    <string name="pref_switch_controls_ambient_off">הקפי →← כבוי</string>
+    <string name="pref_switch_controls_anc_off">ביטול רעש ↔ כבוי</string>
+    <string name="pref_switch_controls_ambient_off">הקפי ↔ כבוי</string>
     <string name="prefs_noise_control">בקרת רעש</string>
     <string name="prefs_voice_detect">זיהוי קול</string>
     <string name="prefs_voice_detect_duration">לסיים לאחר טווח שקט של:</string>
@@ -1627,7 +1602,7 @@
     <string name="open_fw_installer_getting_files_title">קובץ הקושחה/היישומון מתקבל</string>
     <string name="appmanager_item_outdated">(לא עדכני)</string>
     <string name="appmanager_app_share">שיתוף</string>
-    <string name="open_fw_installer_info_text">מתקין הקושחות/פני שעון/יישומונים/קבצים מאפשר לך להעלות/להתקין קבצים נתמכים (קושחה, פני שעון, יישומונים, GPS, משאבים, גופנים…) למכשיר. יש מידע נוסף בוויקי: https://codeberg.org/Freeyourgadget/Gadgetbridge/wiki/Firmware-Update</string>
+    <string name="open_fw_installer_info_text">מתקין הקושחות/פני שעון/יישומונים/קבצים מאפשר לך להעלות/להתקין קבצים נתמכים (קושחה, פני שעון, יישומונים, GPS, משאבים, גופנים…) למכשיר. יש מידע נוסף באתר: https://gadgetbridge.org/internals/features/installer/</string>
     <string name="watchface_dialog_widget_background">רקע</string>
     <string name="hybridhr_widget_bg_thin_circle">עיגול דק</string>
     <string name="hybridhr_widget_bg_double_circle">עיגול כפול</string>
@@ -1993,7 +1968,7 @@
     <string name="pref_pair_bluetooth_calls_help_warning">אזהרה: הפעלת שיחות Bluetooth מבלי לצמד למופע השני תגרום לכך שהודעות שיחה לא תעבודנה כמתוכנן.</string>
     <string name="pref_title_notification_cache_while_disconnected">שמירה במטמון תוך חריגה מהטווח</string>
     <string name="pref_summary_notification_cache_while_disconnected">לשלוח התראות שהוחמצו כאשר ההתקן מתחבר מחדש לאחר היציאה מהטווח</string>
-    <string name="pref_switch_controls_anc_ambient_off">ביטול רעשים →← הקפי →← כבוי</string>
+    <string name="pref_switch_controls_anc_ambient_off">ביטול רעשים ↔ הקפי ↔ כבוי</string>
     <string name="sony_button_mode_help_title">מצבי כפתורים - עזרה</string>
     <string name="sony_button_mode_help_summary">תיאור של כל מצב כפתור</string>
     <string name="single_tap">נגיעה בודדת</string>
@@ -2122,8 +2097,6 @@
     <string name="busy_task_fetch_stress_data">נתוני הלחץ מעודכנים</string>
     <string name="busy_task_fetch_sleep_respiratory_rate_data">נתוני קצב נשימות בשינה מעודכנים</string>
     <string name="activity_prefs_goals">יעדים</string>
-    <string name="error_no_bluetooth_scan">יש להעניק גישה לסריקת Bluetooth ולהפעיל אותה כדי שזה יעבוד כראוי</string>
-    <string name="error_no_bluetooth_connect">יש להעניק גישה לחיבור Bluetooth ולהפעיל אותו כדי שהסריקה תעבוד כראוי</string>
     <string name="permission_request">%1$s מאפשר לך לשלוח הודעות ונתונים נוספים מ־Android למכשיר שלך. כדי לעשות זאת נדרשת גישה לנתונים האלה ובלעדיה, כנראה שזה לא יעבוד כראוי. \n \nעכשיו יוצגו בפניך מספר חלוניות של Android שמבקשות את ההרשאות האלה. \n \nנא לגעת ב־‚%2$s’ כדי להמשיך.</string>
     <string name="activity_type_surfing">גלישה</string>
     <string name="activity_type_windsurfing">גלישת רוח</string>
@@ -2465,7 +2438,6 @@
     <string name="pref_force_smart_alarm">אילוץ התראה חכמה</string>
     <string name="pref_summary_prefix_notification_with_app">להוסיף לפני כותרת ההתראה את שם יישומון המקור</string>
     <string name="strokes_minute">חתירות/דק׳</string>
-    <string name="alarm_smart_wakeup_interval">הפרשי השכמה חכמה:</string>
     <string name="activity_type_cross_trainer">אימון משולב</string>
     <string name="activity_type_stair_stepper">מכשיר מדרגות</string>
     <string name="activity_type_sit_ups">כפיפות בטן</string>
@@ -2549,7 +2521,6 @@
     <string name="state_scanned">נסרק</string>
     <string name="weeksleepchart_sleep_a_week_or_month">שינה בשבוע/חודש</string>
     <string name="pref_header_audio">שמע</string>
-    <string name="weekstepschart_steps_a_week_or_month">צעדים לשבוע/חודש</string>
     <string name="busy_task_fetch_sports_details_interrupted">משיכת פרטי הספורט נקטעה</string>
     <string name="fw_upgrade_notice_amazfitbip3">פעולה זו תתקין את הקושחה %s על ה־Amazfit Bip 3 שלך.
 \n
@@ -2600,8 +2571,6 @@
     <string name="bottom_nav_dashboard">לוח בקרה</string>
     <string name="bottom_nav_devices">התקנים</string>
     <string name="dashboard_settings">הגדרות לוח בקרה</string>
-    <string name="pref_dashboard_first_title">להציג את לוח הבקרה תחילה</string>
-    <string name="pref_dashboard_first_summary">להציג את לוח הבקרה עם הפעלת Gadgetbridge במקום את מסך ההתקנים</string>
     <string name="pref_dashboard_widget_today_24h_title">מצב 24 שעות</string>
     <string name="pref_dashboard_cards_title">הצגת וידג׳טים על הכרטיסים</string>
     <string name="pref_dashboard_widget_today_title">תרשים פעילות</string>
@@ -2640,7 +2609,7 @@
     <string name="pref_adaptive_volume_control_title">בקרת עוצמת שמע מסתגלת</string>
     <string name="watchface_resolution_doesnt_match">רזולוציית פני השעון לא תואמת למסך ההתקן. פני השעון הם %1$s מסך ההתקן הוא %2$s</string>
     <string name="pref_title_bottom_navigation_bar">סרגל ניווט תחתון</string>
-    <string name="huawei_trusleep_warning">אזהרה: הפעלת ההגדרה הזאת תגרום לכל השינה להופיע כקלילה ב־Gadgetbridge! יש ללחוץ כאן אם זה מקובל עליך.</string>
+    <string name="huawei_trusleep_warning">אזהרה: אין מימוש מלא של TruSleep™‎. הפעלתו בחלק מהמכשירים עלו לגרום לכך שכל נתוני השינה יופיע כשינה קלילה ב־GadgetBridge!</string>
     <string name="pref_sleepasandroid_device_summary">נא לבחור התקן כספק נתונים ל־Sleep As Android</string>
     <string name="pref_sleepasandroid_enable_summary">הפעלת שילוב מול Sleep As Android</string>
     <string name="prefs_active_noise_cancelling_light">ביטול רעשים פעיל קליל</string>
@@ -2947,4 +2916,155 @@
     <string name="discovery_connect_usb">חיבור ל־USB</string>
     <string name="usb_connect_select_device_type">בחירת סוג התקן</string>
     <string name="usb_connect_permission_denied">האישור להשתמש בהתקן ה־USB נדחה.</string>
+    <string name="stress_high_avg">ממוצע גבוה</string>
+    <string name="range_integer">%1$d – %2$d</string>
+    <string name="duration_short_day">יום</string>
+    <string name="duration_short_week">שב׳</string>
+    <string name="duration_short_two_weeks">שבועיים</string>
+    <string name="duration_short_month">דק׳</string>
+    <string name="duration_short_six_months">6 ח׳</string>
+    <string name="duration_short_year">שנה</string>
+    <string name="pref_header_device_card">כרטיס מכשיר</string>
+    <string name="pref_device_card_show_items_title">הצגת פריטי כרטיס</string>
+    <string name="pref_device_card_items_title">פריטי כרטיס</string>
+    <string name="pref_device_card_items_summary">התאמת הפריטים בכרטיס המכשיר</string>
+    <string name="device_card_add_item">הוספת פריט</string>
+    <string name="device_card_more_summary">הפריטים שמתחת לזה מוצגים בחלונית צצה</string>
+    <string name="device_card_items_reset_confirmation">לאפס את סדר פריטי כרטיס המכשיר, ולשחזר את הפריטים שהוסרו?</string>
+    <string name="battery_with_label">סוללה: %s</string>
+    <string name="datestep_next_month">החודש הבא</string>
+    <string name="datestep_prev_month">החודש הקודם</string>
+    <string name="datestep_next_week">השבוע הבא</string>
+    <string name="datestep_prev_week">השבוע הקודם</string>
+    <string name="datestep_next_day">היום הבא</string>
+    <string name="datestep_prev_day">היום הקודם</string>
+    <string name="datestep_letter_month">ח׳</string>
+    <string name="datestep_letter_week">שב׳</string>
+    <string name="datestep_letter_day">י׳</string>
+    <plurals name="workout_exercise_picker_filter_count" tools:ignore="MissingQuantity">
+        <item quantity="one">אימון אחד</item>
+        <item quantity="two">שני אימונים</item>
+        <item quantity="other">%d אימונים</item>
+    </plurals>
+    <string name="workout_exercise_picker_filter_title">סינון אימונים</string>
+    <string name="workout_exercise_picker_empty">אין אימונים תואמים</string>
+    <string name="workout_exercise_picker_search_hint">חיפוש אימונים</string>
+    <string name="workout_exercise_picker_title">בחירת אימון</string>
+    <string name="nx_wear_b8_shake_to_take_picture">יש לנער כדי לצלם</string>
+    <string name="nx_wear_b8_measurement_result">תוצאת מדידה</string>
+    <string name="nx_wear_b8_measurement_failed">המדידה נכשלה. יש לענוד את הרצועה היטב ולנסות שוב.</string>
+    <string name="nx_wear_b8_measurement_in_progress">נמדד…</string>
+    <string name="nx_wear_b8_spo2_result">חמצן בדם: %1$d%%</string>
+    <string name="nx_wear_b8_measure_spo2">מדידת חמצן בדם</string>
+    <string name="nx_wear_b8_stress_result">מתח: %1$d</string>
+    <string name="nx_wear_b8_measure_stress">מדידת מתח נפשי</string>
+    <string name="workout_error_exercise_not_supported">אין תמיכה באימונים במכשיר הזה.</string>
+    <string name="workout_error_value_out_of_range">הערך מחוץ לטווח.</string>
+    <string name="workout_error_min_above_max">הערך המזערי לא יכול להיות גדול מהמרבי.</string>
+    <string name="workout_error_secondary_target_conflict">היעדים העיקרי והמשני סותרים.</string>
+    <string name="workout_error_secondary_target_not_supported">אין תמיכה ביעד משני במכשיר הזה.</string>
+    <string name="workout_error_target_not_supported">אין תמיכה ביעדים במכשיר הזה.</string>
+    <string name="workout_error_duration_not_supported">אין תמיכה בסוג משך זמן במכשיר הזה.</string>
+    <string name="workout_error_name_required">נא למלא שם.</string>
+    <string name="workout_error_name_too_long">השם ארוך מדי.</string>
+    <string name="workout_error_note_too_long">ההערה ארוכה מדי.</string>
+    <string name="workout_error_no_steps">יש להוסיף צעד אחד לפחות.</string>
+    <string name="workout_error_too_many_steps">יותר מדי צעדים למכשיר הזה.</string>
+    <string name="workout_error_repeat_not_supported">המכשיר הזה לא תומך בקבוצות חזרה.</string>
+    <string name="workout_error_repeat_count_out_of_range">כמות החזרות היא מחוץ לטווח.</string>
+    <string name="workout_unit_suffix_per_100m">ל־100 מטר</string>
+    <string name="workout_unit_suffix_per_km">לק״מ</string>
+    <string name="workout_error_sport_not_supported">המכשיר הזה לא תומך בסוג הספורט הזה.</string>
+    <string name="workout_unit_suffix_steps_per_minute">לדקה</string>
+    <string name="workout_unit_suffix_seconds">שנ׳</string>
+    <string name="workout_unit_suffix_watt">W</string>
+    <string name="workout_field_equipment">ציוד</string>
+    <string name="workout_field_unit">יחידה</string>
+    <string name="workout_field_minimum">מזערי</string>
+    <string name="workout_field_maximum">מרבי</string>
+    <string name="workout_field_step_type">סוג צעד</string>
+    <string name="workout_field_secondary_target">יעד משני</string>
+    <string name="workout_field_action_name">שם פעולה</string>
+    <string name="workout_field_yoga_pose">תנוחה</string>
+    <string name="workout_field_pilates_move">תנועה</string>
+    <string name="workout_pool_length_25m">25 מ׳</string>
+    <string name="workout_effort_recovery">השתקמות</string>
+    <string name="workout_effort_hard">קשה</string>
+    <string name="workout_effort_very_hard">קשה מאוד</string>
+    <string name="workout_effort_all_out">טירוף</string>
+    <string name="workout_pool_length_unspecified">לא צוין</string>
+    <string name="workout_pool_length_50m">50 מ׳</string>
+    <string name="workout_equipment_snorkel">שנורקל</string>
+    <string name="workout_effort_ascending">עולה</string>
+    <string name="workout_effort_descending">יורד</string>
+    <plurals name="workout_value_repetitions" tools:ignore="MissingQuantity">
+        <item quantity="one">חזרה אחת</item>
+        <item quantity="two">שתי חזרות</item>
+        <item quantity="other">%1$s חזרות</item>
+    </plurals>
+    <plurals name="workout_value_laps" tools:ignore="MissingQuantity">
+        <item quantity="one">הקפה אחת</item>
+        <item quantity="two">שתי הקפות</item>
+        <item quantity="other">%1$s הקפות</item>
+    </plurals>
+    <plurals name="workout_value_strokes" tools:ignore="MissingQuantity">
+        <item quantity="one">חתירה אחת</item>
+        <item quantity="two">שתי חתירות</item>
+        <item quantity="other">%1$s חתירות</item>
+    </plurals>
+    <string name="workout_swim_stroke_choice">בחירה</string>
+    <string name="workout_weight_body_weight">משקל גוף</string>
+    <string name="workout_hr_zone_1">אזור 1 - חימום</string>
+    <string name="workout_hr_zone_2">אזור 2 - קל</string>
+    <string name="workout_hr_zone_3">אזור 3 - אירובי</string>
+    <string name="workout_hr_zone_4">אזור 4 - אנאירובי</string>
+    <string name="workout_hr_zone_5">אזור 5 - מרבי</string>
+    <string name="workout_power_zone_1">אזור 1</string>
+    <string name="workout_power_zone_2">אזור 2</string>
+    <string name="workout_power_zone_3">אזור 3</string>
+    <string name="workout_power_zone_4">אזור 4</string>
+    <string name="workout_power_zone_5">אזור 5</string>
+    <string name="workout_power_zone_6">אזור 6</string>
+    <string name="workout_power_zone_7">אזור 7</string>
+    <string name="workout_target_hr_range">טווח דופק</string>
+    <string name="workout_target_none">אין יעד</string>
+    <string name="workout_target_hr_zone">אזור דופק</string>
+    <string name="workout_duration_hr_below">דופק מתחת ל־</string>
+    <string name="workout_step_type_warmup">חימום</string>
+    <string name="workout_step_type_recover">השתקמות</string>
+    <string name="workout_step_type_rest">מנוחה</string>
+    <string name="workout_step_type_cooldown">התקררות</string>
+    <string name="workout_step_type_main">ראשי</string>
+    <string name="workout_step_type_swim">שחייה</string>
+    <string name="workout_duration_hr_above">דופק מעל</string>
+    <string name="workout_template_sync_started">„%1$s” נשלח למכשיר</string>
+    <string name="workout_template_sync_failed_transfer">העברת הקבצים נכשלה</string>
+    <string name="workout_sync_status_in_progress">נשלח…</string>
+    <string name="workout_sync_status_failed">הסנכרון נכשל</string>
+    <string name="workout_template_sync">שליחה למכשיר</string>
+    <string name="workout_sync_status_out_of_date">לא עדכני</string>
+    <plurals name="workout_template_step_count" tools:ignore="MissingQuantity">
+        <item quantity="one">צעד אחד</item>
+        <item quantity="two">שני צעדים</item>
+        <item quantity="other">%d צעדים</item>
+    </plurals>
+    <string name="workout_sync_status_not_synced">לא מסונכרן</string>
+    <string name="workout_sync_status_synced">מסונכרן</string>
+    <string name="workout_template_unsupported">לא נתמך על ידי המכשיר הזה</string>
+    <string name="workout_template_share_failed">לא ניתן לשתף את תבנית האימון הזאת</string>
+    <string name="workout_template_keep_editing">להמשיך בעריכה</string>
+    <string name="workout_template_save_failed">לא ניתן לשמור את תבנית האימון הזאת.</string>
+    <string name="workout_template_discard">להתעלם</string>
+    <string name="workout_template_discard_title">לסלק את השינויים?</string>
+    <string name="workout_template_discard_message">בתבנית האימון הזאת יש שינויים שלא נשמרו. יציאה עכשיו תוביל לכך שיאבדו.</string>
+    <string name="workout_template_validation_title">לא ניתן לשמור את האימון הזה</string>
+    <string name="workout_template_copy_name">%1$s (עותק)</string>
+    <string name="workout_template_add">הוספת תבנית אימון</string>
+    <string name="pref_workout_templates_title">תבנית אימון</string>
+    <string name="pref_title_navigation_update_rate">קצב עדכון למצב רציף (במילישניות)</string>
+    <string name="navigation_destination_reached">הגעת ליעד</string>
+    <string name="navigation_eta">זמן משוער: %1$s</string>
+    <string name="navigation_distance_left">נותרו %1$s</string>
+    <string name="map_theme_indigo">אינדיגו</string>
+    <string name="map_theme_dark_low_contrast">כהה (ניגודיות נמוכה)</string>
 </resources>

@@ -50,11 +50,6 @@ public class MiBand9Coordinator extends XiaomiCoordinator {
     }
 
     @Override
-    public boolean isExperimental() {
-        return true;
-    }
-
-    @Override
     public DeviceCoordinator.DeviceKind getDeviceKind(@NonNull GBDevice device) {
         return DeviceCoordinator.DeviceKind.FITNESS_BAND;
     }

@@ -30,6 +30,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -39,6 +40,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -122,6 +124,9 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
         deviceList = deviceManager.getDevices();
         mGBDeviceAdapter = new GBDeviceAdapterv2(currentView.getContext(), deviceList, deviceActivityHashMap);
         mGBDeviceAdapter.setHasStableIds(true);
+        if (savedInstanceState != null) {
+            mGBDeviceAdapter.restoreInstanceState(savedInstanceState);
+        }
 
         deviceListView.setAdapter(this.mGBDeviceAdapter);
 
@@ -233,6 +238,14 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
         super.onDestroy();
     }
 
+    @Override
+    public void onSaveInstanceState(@NonNull final Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (mGBDeviceAdapter != null) {
+            mGBDeviceAdapter.saveInstanceState(outState);
+        }
+    }
+
     private DailyTotals getSteps(GBDevice device, DBHandler db) {
         Calendar day = GregorianCalendar.getInstance();
 
@@ -258,10 +271,13 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
 
     public class RefreshTask extends DBAccess {
         private final GBDevice device;
+        private final List<GBDevice> devices;
 
         public RefreshTask(final String task, final Context context, final GBDevice device) {
             super(task, context, false);
             this.device = device;
+            // The DeviceManager updates the device list on the main thread
+            this.devices = new ArrayList<>(deviceList);
         }
 
         @Override
@@ -269,7 +285,7 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
             if (device != null) {
                 updateDevice(db, device);
             } else {
-                for (GBDevice gbDevice : deviceList) {
+                for (final GBDevice gbDevice : devices) {
                     updateDevice(db, gbDevice);
                 }
             }

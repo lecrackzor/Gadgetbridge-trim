@@ -18,7 +18,6 @@ class WorkoutStatisticsActivity : AbstractGBActivity() {
         super.onCreate(savedInstanceState)
 
         val device = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
-            ?: throw IllegalArgumentException("Must provide a device when invoking this activity")
 
         setContentView(R.layout.activity_workout_statistics)
 

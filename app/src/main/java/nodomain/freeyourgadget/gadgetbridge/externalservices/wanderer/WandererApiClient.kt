@@ -36,7 +36,7 @@ class WandererApiClient(
     private fun buildHeaders(): MutableMap<String, String> {
         val headers: MutableMap<String, String> = mutableMapOf()
 
-        tokenManager.getAPIToken()?.let { token ->
+        tokenManager.getApiToken()?.let { token ->
             headers["Authorization"] = "Bearer $token"
         }
 

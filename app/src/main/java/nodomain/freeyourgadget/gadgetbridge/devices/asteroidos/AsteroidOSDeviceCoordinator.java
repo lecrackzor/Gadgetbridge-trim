@@ -68,6 +68,16 @@ public class AsteroidOSDeviceCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public boolean supportsFindDevice(@NonNull GBDevice device) {
         return true;
     }
@@ -82,8 +92,8 @@ public class AsteroidOSDeviceCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return AsteroidOSDeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new AsteroidOSDeviceSupport();
     }
 
     @Override

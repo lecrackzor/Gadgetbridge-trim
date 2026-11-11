@@ -1,15 +1,11 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.generic_hr
 
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.HeartRrIntervalSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -43,8 +39,8 @@ class GenericHeartRateCoordinator : AbstractBLEDeviceCoordinator() {
         return "Generic"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return GenericHeartRateSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return GenericHeartRateSupport()
     }
 
     override fun getDeviceNameResource(): Int {
@@ -65,15 +61,6 @@ class GenericHeartRateCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getSampleProvider(device: GBDevice, session: DaoSession): SampleProvider<out AbstractActivitySample>? {
         return GenericHeartRateActivitySampleProvider(device, session)
-    }
-
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> {
-        return object : HashMap<AbstractDao<*, *>, Property>() {
-            init {
-                put(session.genericHeartRateSampleDao, GenericHeartRateSampleDao.Properties.DeviceId)
-                put(session.heartRrIntervalSampleDao, HeartRrIntervalSampleDao.Properties.DeviceId)
-            }
-        }
     }
 
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind {

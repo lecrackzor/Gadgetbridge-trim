@@ -17,6 +17,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.FileType
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.FitBaseUnit
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.FitDevice
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.GarminSport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WktStepDuration
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WktStepTarget
@@ -45,6 +46,8 @@ object GarminWorkoutFitEncoder {
 
     private const val MESG_NUM_WORKOUT_STEP = 27
     private const val FIELD_NUM_NOTES = 8
+
+    private const val EXERCISE_WEIGHT_TYPE_PERCENT_1RM = 5
 
     /**
      * The maximum size of a FIT field, excluding the null terminator.
@@ -109,7 +112,7 @@ object GarminWorkoutFitEncoder {
                 builder.setPoolLengthUnit(GarminWorkoutCodes.poolLengthUnitCode(unit))
             }
             val distanceCm = estimatedDistanceCm(template)
-            builder.setDurationType(WktStepDuration.DISTANCE.num)
+            builder.setDurationType(WktStepDuration.DISTANCE)
             builder.setDurationValue(distanceCm)
             builder.setDistance(distanceCm / 100.0)
             builder.setDistanceFlag(0)
@@ -311,7 +314,7 @@ object GarminWorkoutFitEncoder {
 
                 WorkoutWeightType.PERCENT_1RM -> {
                     builder.setExerciseWeightPercent(node.weightValue ?: 0)
-                    builder.setExerciseWeightType(5) // constant seen on every %-of-1RM capture
+                    builder.setExerciseWeightType(EXERCISE_WEIGHT_TYPE_PERCENT_1RM)
                 }
 
                 WorkoutWeightType.LOAD_CATEGORY -> {
@@ -371,7 +374,7 @@ object GarminWorkoutFitEncoder {
                 val effort = WorkoutEffort.fromName(target.enumValue)
                 if (effort != null) {
                     builder.setSecondaryTargetType(WktStepTarget.SWIM_EFFORT)
-                    builder.setSecondaryTargetValue(GarminWorkoutCodes.effortCode(effort))
+                    builder.setSecondaryTargetValue(GarminWorkoutCodes.effortCode(effort).num.toLong())
                     return
                 }
                 LOG.warn("Unknown swim effort {}, encoding no target", target.enumValue)
@@ -492,8 +495,8 @@ object GarminWorkoutFitEncoder {
     private fun fileId(timestampSeconds: Long): FitFileId =
         FitFileId.Builder()
             .setType(FileType.FILETYPE.WORKOUTS)
-            .setManufacturer(1)
-            .setProduct(65534)
+            .setManufacturer(FitDevice.M1_P65534.manufacturer)
+            .setProduct(FitDevice.M1_P65534.product)
             .setSerialNumber(1L)
             .setNumber(1)
             .setTimeCreated(timestampSeconds)

@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/device_card_items_reset"
-        android:icon="@drawable/ic_refresh"
+        android:icon="@drawable/ic_settings_backup_restore"
         android:title="@string/reset"
         app:iconTint="?attr/actionmenu_icon_color"
         app:showAsAction="ifRoom" />

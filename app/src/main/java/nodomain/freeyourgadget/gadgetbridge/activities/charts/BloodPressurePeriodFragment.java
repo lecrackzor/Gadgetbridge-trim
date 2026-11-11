@@ -105,11 +105,7 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
     protected void init() {
         SYSTOLIC_COLOR = ContextCompat.getColor(requireContext(), R.color.blood_pressure_systolic_color);
         DIASTOLIC_COLOR = ContextCompat.getColor(requireContext(), R.color.blood_pressure_diastolic_color);
-        if (GBApplication.getPrefs().getBoolean("chart_heartrate_color", false)) {
-            HEART_RATE_COLOR = ContextCompat.getColor(requireContext(), R.color.chart_heartrate_alternative);
-        } else {
-            HEART_RATE_COLOR = ContextCompat.getColor(requireContext(), R.color.chart_heartrate);
-        }
+        HEART_RATE_COLOR = ContextCompat.getColor(requireContext(), GBApplication.getPrefs().getChartsHeartRateColor().getColorRes());
     }
 
     @Override

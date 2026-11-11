@@ -49,6 +49,7 @@ import java.util.List;
 import lineageos.weather.util.TemperatureUtils;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartDataBuilder;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -76,11 +77,7 @@ public class TemperatureChartFragment extends AbstractChartFragment<TemperatureC
 
     }
     private int getRangeDays() {
-        if (GBApplication.getPrefs().getBoolean("charts_range", true)) {
-            return 30;
-        } else {
-            return 7;
-        }
+        return GBApplication.getPrefs().getChartsRange().getDays();
     }
 
     @Override
@@ -201,7 +198,7 @@ public class TemperatureChartFragment extends AbstractChartFragment<TemperatureC
             }
 
             LineDataSet dataSet = new LineDataSet(entries, getString(R.string.menuitem_temperature));
-            dataSet.setLineWidth(2.2f);
+            dataSet.setLineWidth(ChartDataBuilder.LINE_WIDTH_DP);
             dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
             dataSet.setCubicIntensity(0.1f);
             dataSet.setDrawCirclesEnabled(true);

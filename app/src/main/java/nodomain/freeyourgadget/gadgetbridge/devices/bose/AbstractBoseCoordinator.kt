@@ -69,8 +69,8 @@ abstract class AbstractBoseCoordinator : AbstractBLClassicDeviceCoordinator() {
         R.string.hindi to "22",
     )
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return BoseSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return BoseSupport()
     }
 
     override fun getManufacturer(): String {
@@ -256,4 +256,10 @@ abstract class AbstractBoseCoordinator : AbstractBLClassicDeviceCoordinator() {
             )
         }
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 }

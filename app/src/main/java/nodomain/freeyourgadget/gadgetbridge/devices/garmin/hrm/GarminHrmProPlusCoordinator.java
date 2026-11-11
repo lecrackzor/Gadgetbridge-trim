@@ -53,8 +53,8 @@ public class GarminHrmProPlusCoordinator extends GarminCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
-        return GarminSupportHrm.class;
+    public DeviceSupport createDeviceSupport(@NonNull final GBDevice device) {
+        return new GarminSupportHrm();
     }
 
     @Override
@@ -131,5 +131,30 @@ public class GarminHrmProPlusCoordinator extends GarminCoordinator {
         }
 
         return gbDevice;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsInternetAccess(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
+        return false;
     }
 }

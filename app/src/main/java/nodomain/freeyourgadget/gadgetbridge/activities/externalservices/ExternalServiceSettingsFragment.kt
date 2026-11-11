@@ -80,11 +80,16 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
         ) { _, bundle ->
             if (bundle.getBoolean("success", false)) {
                 refresh()
+                refreshStatus()
             }
         }
 
         service.onSettingsScreenCreated(this)
         refresh()
+        refreshStatus()
+    }
+
+    private fun refreshStatus() {
         service.refreshStatus(requireContext()) {
             activity?.runOnUiThread {
                 if (isAdded) refresh()
@@ -100,11 +105,15 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
     private fun logOut() {
         lifecycleScope.launch {
             val context = requireContext()
-            val success = withContext(Dispatchers.IO) { service.logout(context) }
-            if (success) {
-                GB.toast(getString(R.string.endurain_logged_out_successfully), Toast.LENGTH_SHORT, GB.INFO)
+            val confirmed = withContext(Dispatchers.IO) { service.logout(context) }
+            if (confirmed) {
+                GB.toast(getString(R.string.service_logged_out), Toast.LENGTH_SHORT, GB.INFO)
             } else {
-                GB.toast(getString(R.string.endurain_logout_failed), Toast.LENGTH_SHORT, GB.WARN)
+                GB.toast(
+                    getString(R.string.service_logged_out_unconfirmed, getString(service.nameRes)),
+                    Toast.LENGTH_LONG,
+                    GB.WARN
+                )
             }
             refresh()
         }

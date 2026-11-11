@@ -37,15 +37,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import de.greenrobot.dao.AbstractDao;
-import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
@@ -65,17 +61,10 @@ import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.WorkoutLoadSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiDailySummarySampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
-import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
-import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivityFileDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiDailySummarySample;
-import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiDailySummarySampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiManualSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepStageSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepTimeSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericRespiratoryRateSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
@@ -118,8 +107,8 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
-        return XiaomiSupport.class;
+    public DeviceSupport createDeviceSupport(@NonNull final GBDevice device) {
+        return new XiaomiSupport();
     }
 
     @Override
@@ -141,20 +130,6 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     public InstallHandler findInstallHandler(final Uri uri, final Bundle options, final Context context) {
         final XiaomiInstallHandler handler = new XiaomiInstallHandler(uri, context);
         return handler.isValid() ? handler : null;
-    }
-
-    @Override
-    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(8);
-        map.put(session.getBaseActivitySummaryDao(), BaseActivitySummaryDao.Properties.DeviceId);
-        map.put(session.getGenericDurationSampleDao(), GenericDurationSampleDao.Properties.DeviceId);
-        map.put(session.getXiaomiActivitySampleDao(), XiaomiActivitySampleDao.Properties.DeviceId);
-        map.put(session.getXiaomiActivityFileDao(), XiaomiActivityFileDao.Properties.DeviceId);
-        map.put(session.getXiaomiDailySummarySampleDao(), XiaomiDailySummarySampleDao.Properties.DeviceId);
-        map.put(session.getXiaomiManualSampleDao(), XiaomiManualSampleDao.Properties.DeviceId);
-        map.put(session.getXiaomiSleepStageSampleDao(), XiaomiSleepStageSampleDao.Properties.DeviceId);
-        map.put(session.getXiaomiSleepTimeSampleDao(), XiaomiSleepTimeSampleDao.Properties.DeviceId);
-        return map;
     }
 
     @Override
@@ -233,8 +208,7 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public TimeSampleProvider<? extends RespiratoryRateSample> getRespiratoryRateSampleProvider(@NonNull final GBDevice device, final DaoSession session) {
-        // TODO XiaomiSleepRespiratoryRateSampleProvider
-        return super.getRespiratoryRateSampleProvider(device, session);
+        return new GenericRespiratoryRateSampleProvider(device, session);
     }
 
     @Nullable
@@ -280,6 +254,11 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsAppsManagement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsWatchAppMessages(@NonNull final GBDevice device) {
         return true;
     }
 
@@ -440,8 +419,7 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsSleepRespiratoryRate(@NonNull GBDevice device) {
-        // TODO it does
-        return false;
+        return true;
     }
 
     @Override
@@ -773,6 +751,36 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSmsReply(@NonNull final GBDevice device) {
+        return getCannedRepliesSlotCount(device) > 0;
+    }
+
+    @Override
+    public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
         return true;
     }
 

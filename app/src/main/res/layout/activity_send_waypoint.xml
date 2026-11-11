@@ -10,6 +10,10 @@
         android:paddingHorizontal="@dimen/activity_horizontal_margin"
         android:paddingVertical="@dimen/activity_vertical_margin">
 
+        <include
+            android:id="@+id/mapPreview"
+            layout="@layout/send_waypoint_map_preview" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

@@ -133,11 +133,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
     }
 
     private int getRangeDays() {
-        if (GBApplication.getPrefs().getBoolean("charts_range", true)) {
-            return 30;
-        } else {
-            return 7;
-        }
+        return GBApplication.getPrefs().getChartsRange().getDays();
     }
 
     private int getPaiTarget() {
@@ -146,7 +142,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
 
     @Override
     public String getTitle() {
-        if (GBApplication.getPrefs().getBoolean("charts_range", true)) {
+        if (GBApplication.getPrefs().getChartsRange() == ChartsRange.MONTH) {
             return getString(R.string.pai_chart_per_month);
         } else {
             return getString(R.string.pai_chart_per_week);

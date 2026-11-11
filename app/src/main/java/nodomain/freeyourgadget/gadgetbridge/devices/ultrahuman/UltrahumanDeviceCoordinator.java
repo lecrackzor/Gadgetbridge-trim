@@ -24,13 +24,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-import de.greenrobot.dao.AbstractDao;
-import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
@@ -46,13 +42,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.samples.UltrahumanActivitySampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.UltrahumanActivitySampleDao;
-import nodomain.freeyourgadget.gadgetbridge.entities.UltrahumanDeviceStateSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample;
@@ -90,20 +79,6 @@ public class UltrahumanDeviceCoordinator extends AbstractBLEDeviceCoordinator {
         return list;
     }
 
-    @NonNull
-    @Override
-    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(7);
-        map.put(session.getGenericHeartRateSampleDao(), GenericHeartRateSampleDao.Properties.DeviceId);
-        map.put(session.getGenericHrvValueSampleDao(), GenericHrvValueSampleDao.Properties.DeviceId);
-        map.put(session.getGenericSpo2SampleDao(), GenericSpo2SampleDao.Properties.DeviceId);
-        map.put(session.getGenericStressSampleDao(), GenericStressSampleDao.Properties.DeviceId);
-        map.put(session.getGenericTemperatureSampleDao(), GenericTemperatureSampleDao.Properties.DeviceId);
-        map.put(session.getUltrahumanActivitySampleDao(), UltrahumanActivitySampleDao.Properties.DeviceId);
-        map.put(session.getUltrahumanDeviceStateSampleDao(), UltrahumanDeviceStateSampleDao.Properties.DeviceId);
-        return map;
-    }
-
     @DrawableRes
     @Override
     public int getDefaultIconResource() {
@@ -118,8 +93,8 @@ public class UltrahumanDeviceCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return UltrahumanDeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new UltrahumanDeviceSupport();
     }
 
     @Override

@@ -7,9 +7,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
+import android.widget.AbsListView;
+import android.widget.ScrollView;
+import android.widget.TextView;
 
 import androidx.annotation.AttrRes;
 import androidx.annotation.Nullable;
+import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -56,8 +60,8 @@ public final class BarShade {
 
     /**
      * Shows a shade at the top and at the bottom of a screen, while the content scrolls past that
-     * edge. Looks for the view that scrolls below {@code root} again after every layout, so that
-     * it follows the page of a pager and content that loads later. Moves each shade to the edge
+     * edge. Looks for the view that scrolls below {@code root} again at every update, so that it
+     * follows the page of a pager and content that loads later. Moves each shade to the edge
      * of that view, so that a row which stays in place, such as a row of tabs, remains above the
      * shade.
      */
@@ -72,7 +76,6 @@ public final class BarShade {
         private View bottomShadeView;
         private Fader topShade;
         private Fader bottomShade;
-        private View scrolling;
         private boolean updatePosted;
 
         public ScrollListener(final View root) {
@@ -173,17 +176,14 @@ public final class BarShade {
 
         @Override
         public void onGlobalLayout() {
-            // The page of a pager, and the content of a list, change with the layout
-            scrolling = null;
             postUpdate();
         }
 
         @Override
         public void run() {
             updatePosted = false;
-            if (scrolling == null) {
-                scrolling = findScrolling(root);
-            }
+            // A pager can change its page without a layout
+            final View scrolling = findScrolling(root);
             final boolean atTop = scrolling == null || !scrolling.canScrollVertically(-1);
             final boolean atBottom = scrolling == null || !scrolling.canScrollVertically(1);
             installDividers();
@@ -237,14 +237,15 @@ public final class BarShade {
 
         @Nullable
         private static View findScrolling(final View view) {
-            if (view.getVisibility() != View.VISIBLE) {
+            // With large font sizes, a text view might report that it can scroll when its text is taller than the view
+            if (view.getVisibility() != View.VISIBLE || view instanceof TextView) {
                 return null;
             }
             if (view instanceof ViewPager2) {
                 final View page = currentPage((ViewPager2) view);
                 return page != null ? findScrolling(page) : null;
             }
-            if (view.canScrollVertically(-1) || view.canScrollVertically(1)) {
+            if (view.canScrollVertically(-1) || view.canScrollVertically(1) || isScrollContainer(view)) {
                 return view;
             }
             if (view instanceof ViewGroup) {
@@ -257,6 +258,14 @@ public final class BarShade {
                 }
             }
             return null;
+        }
+
+        private static boolean isScrollContainer(final View view) {
+            if (view instanceof RecyclerView) {
+                final RecyclerView.LayoutManager layoutManager = ((RecyclerView) view).getLayoutManager();
+                return layoutManager != null && layoutManager.canScrollVertically();
+            }
+            return view instanceof NestedScrollView || view instanceof ScrollView || view instanceof AbsListView;
         }
 
         @Nullable

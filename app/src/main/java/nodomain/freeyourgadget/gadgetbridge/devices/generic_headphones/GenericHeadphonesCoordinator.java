@@ -64,8 +64,8 @@ public class GenericHeadphonesCoordinator extends AbstractDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return GenericHeadphonesSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new GenericHeadphonesSupport();
     }
 
     @Override
@@ -93,5 +93,20 @@ public class GenericHeadphonesCoordinator extends AbstractDeviceCoordinator {
     @Override
     public DeviceCoordinator.DeviceKind getDeviceKind(@NonNull GBDevice device) {
         return DeviceKind.HEADPHONES;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return true;
     }
 }

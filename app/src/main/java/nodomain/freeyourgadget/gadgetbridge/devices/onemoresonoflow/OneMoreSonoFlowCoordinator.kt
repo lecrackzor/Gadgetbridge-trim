@@ -26,8 +26,8 @@ open class OneMoreSonoFlowCoordinator : AbstractBLClassicDeviceCoordinator() {
         return "1MORE"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return OneMoreSonoFlowSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return OneMoreSonoFlowSupport()
     }
 
     override fun getDeviceNameResource(): Int {
@@ -95,4 +95,10 @@ open class OneMoreSonoFlowCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind {
         return DeviceCoordinator.DeviceKind.HEADPHONES
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 }

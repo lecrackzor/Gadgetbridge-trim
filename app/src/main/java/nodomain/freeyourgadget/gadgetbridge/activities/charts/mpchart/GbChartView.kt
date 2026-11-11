@@ -35,6 +35,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartTheme
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartValueFormat
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.DURATION_LABEL_SPACINGS_SECONDS
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.XMarkerSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.fixedLabelValues
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.labelFor
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.timeLabelValues
@@ -60,6 +61,8 @@ class GbChartView @JvmOverloads constructor(
     private val accessibility = ChartSlotAccessibilityHelper(this)
     private val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stagesRenderer = StagesRenderer()
+    private val markerLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val markerLines = mutableListOf<Pair<XMarkerSpec, LimitLine>>()
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent) = true
 
@@ -290,20 +293,48 @@ class GbChartView @JvmOverloads constructor(
      */
     private fun resetXLimitLines() {
         xAxis.removeAllLimitLines()
+        markerLines.clear()
         for (marker in spec?.xMarkers.orEmpty()) {
-            xAxis.addLimitLine(LimitLine((marker.value - xOrigin).toFloat(), marker.label.orEmpty()).apply {
+            val line = LimitLine((marker.value - xOrigin).toFloat(), marker.label.orEmpty()).apply {
                 lineColor = marker.color
                 lineWidth = X_MARKER_WIDTH_DP
                 textColor = theme.textColor
                 textSize = X_MARKER_TEXT_SP
-                labelPosition = when {
-                    marker.labelBeforeLine && marker.labelAtBottom -> LimitLine.LimitLabelPosition.LEFT_BOTTOM
-                    marker.labelBeforeLine -> LimitLine.LimitLabelPosition.LEFT_TOP
-                    marker.labelAtBottom -> LimitLine.LimitLabelPosition.RIGHT_BOTTOM
-                    else -> LimitLine.LimitLabelPosition.RIGHT_TOP
-                }
-            })
+                labelPosition = labelPosition(marker.labelAtBottom, marker.labelBeforeLine)
+            }
+            markerLines += marker to line
+            xAxis.addLimitLine(line)
         }
+    }
+
+    /**
+     * Moves or hides the x marker labels so that none overlaps another at the current size and zoom.
+     */
+    private fun layoutMarkerLabels() {
+        if (markerLines.isEmpty() || viewPortHandler.contentWidth <= 0f) return
+        // LimitLine keeps its text size, line width and offset in dp; the renderer converts them when it draws
+        val labels = markerLines.map { (marker, line) ->
+            markerLabelPaint.textSize = Utils.convertDpToPixel(line.textSize)
+            XMarkerLabelLayout.Label(
+                x = pixelX(marker.value),
+                width = markerLabelPaint.measureText(marker.label.orEmpty()) +
+                        Utils.convertDpToPixel(line.lineWidth) + Utils.convertDpToPixel(line.xOffset),
+                atBottom = marker.labelAtBottom,
+                beforeLine = marker.labelBeforeLine,
+            )
+        }
+        val placements = XMarkerLabelLayout.place(labels, viewPortHandler.contentLeft, viewPortHandler.contentRight)
+        markerLines.zip(placements) { (marker, line), placement ->
+            line.label = if (placement == null) "" else marker.label.orEmpty()
+            if (placement != null) line.labelPosition = labelPosition(placement.atBottom, placement.beforeLine)
+        }
+    }
+
+    private fun labelPosition(atBottom: Boolean, beforeLine: Boolean) = when {
+        beforeLine && atBottom -> LimitLine.LimitLabelPosition.LEFT_BOTTOM
+        beforeLine -> LimitLine.LimitLabelPosition.LEFT_TOP
+        atBottom -> LimitLine.LimitLabelPosition.RIGHT_BOTTOM
+        else -> LimitLine.LimitLabelPosition.RIGHT_TOP
     }
 
     private fun guide(x: Double) = LimitLine((x - xOrigin).toFloat()).apply {
@@ -410,6 +441,7 @@ class GbChartView @JvmOverloads constructor(
             timeLabelsFor(spec.xAxis)?.let { labels -> xAxisLabels.values = labels.map { it - xOrigin } }
             updateDayLabels(spec.xAxis)
         }
+        layoutMarkerLabels()
         super.onDraw(canvas)
 
         val selected = selectedX ?: return
@@ -544,6 +576,7 @@ class GbChartView @JvmOverloads constructor(
         val label = spec.labeler ?: labelFor(spec.format)
         val unit = spec.unit
         axis.isDrawLabelsEnabled = spec.showLabels
+        if (axis === axisLeft) axis.isDrawGridLinesEnabled = spec.showGrid
         axis.valueFormatter = formatterFor { value -> if (unit == null) label(value) else "${label(value)} $unit" }
         axis.isGranularityEnabled = spec.format == ChartValueFormat.INTEGER
         spec.minimum?.let { axis.axisMinimum = it.toFloat() } ?: axis.resetAxisMinimum()

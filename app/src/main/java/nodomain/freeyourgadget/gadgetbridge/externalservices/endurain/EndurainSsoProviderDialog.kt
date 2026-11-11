@@ -30,7 +30,7 @@ class EndurainSsoProviderDialog(
         val providerNames = providers.map { it.name }.toTypedArray()
 
         MaterialAlertDialogBuilder(context)
-            .setTitle(context.getString(R.string.endurain_select_identity_provider))
+            .setTitle(context.getString(R.string.service_select_identity_provider))
             .setItems(providerNames) { dialog, which ->
                 onProviderSelected(providers[which])
                 dialog.dismiss()

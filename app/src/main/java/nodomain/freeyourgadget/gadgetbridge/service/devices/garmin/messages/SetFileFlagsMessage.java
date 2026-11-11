@@ -31,7 +31,7 @@ public class SetFileFlagsMessage extends GFDIMessage {
         CRYPTO, // 4 - 0x04 - 0000_0100
         APPEND, // 8 - 0x08 - 0000_1000
         ARCHIVE, // 16 - 0x10 - 0001_0000
-        DELETE, // 32 - 0x20 - 0010_0000
+        ERASE, // 32 - 0x20 - 0010_0000
         WRITE, // 64 - 0x40 - 0100_0000
         READ, // 128 - 0x80 - 1000_0000
         ;

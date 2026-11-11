@@ -30,7 +30,6 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.widget.Toast;
@@ -68,6 +67,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.automations.AutomationsSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsPreferencesActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.discovery.DiscoveryPairingPreferenceActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.elevation.ElevationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.externalservices.OnlineFitnessTrackersPreferencesActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.maps.MapsSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.preferences.HealthConnectPreferencesActivity;
@@ -111,6 +111,8 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
             open(NotificationManagementActivity.class, result);
         } else if (result.getResourceFile() == R.xml.map_settings) {
             open(MapsSettingsActivity.class, result);
+        } else if (result.getResourceFile() == R.xml.elevation_settings) {
+            open(ElevationSettingsActivity.class, result);
         } else if (result.getResourceFile() == R.xml.automations_settings) {
             open(AutomationsSettingsActivity.class, result);
         } else if (result.getResourceFile() == R.xml.internethelper_preferences) {
@@ -139,7 +141,7 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
     public static class SettingsFragment extends AbstractPreferenceFragment {
         private static final Logger LOG = LoggerFactory.getLogger(SettingsActivity.class);
 
-        /** Must stay in sync with GBApplication#getAccentColorOverlay() and the ThemeOverlay.App.Accent.* styles. */
+        /** Must stay in sync with GBApplication#getAccentColorOverlay(boolean) and the ThemeOverlay.App.Accent.* styles. */
         private static final String[] ACCENT_COLOR_KEYS = {
                 "red", "coral", "orange", "amber", "lime", "green",
                 "teal", "cyan", "blue", "indigo", "violet", "pink", "white",
@@ -186,6 +188,7 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
             index(R.xml.discovery_pairing_preferences, R.string.activity_prefs_discovery_pairing);
             index(R.xml.notifications_preferences, R.string.pref_header_notifications);
             index(R.xml.map_settings, R.string.maps_settings);
+            index(R.xml.elevation_settings, R.string.elevation_correction);
             index(R.xml.automations_settings, R.string.pref_header_automations);
             if (!GBApplication.hasDirectInternetAccess())
                 index(R.xml.internethelper_preferences, R.string.prefs_internet_helper_title);
@@ -459,6 +462,14 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                 });
             }
 
+            pref = findPreference("pref_category_elevation_correction");
+            if (pref != null) {
+                pref.setOnPreferenceClickListener(preference -> {
+                    startActivity(new Intent(requireContext(), ElevationSettingsActivity.class));
+                    return true;
+                });
+            }
+
             pref = findPreference("pref_screen_automations");
             if (pref != null) {
                 pref.setOnPreferenceClickListener(preference -> {
@@ -470,15 +481,11 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
 
             pref = findPreference("pref_screen_quick_settings");
             if (pref != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    pref.setOnPreferenceClickListener(preference -> {
-                        Intent enableIntent = new Intent(requireContext(), QuickSettingsPreferencesActivity.class);
-                        startActivity(enableIntent);
-                        return true;
-                    });
-                } else {
-                    pref.setVisible(false);
-                }
+                pref.setOnPreferenceClickListener(preference -> {
+                    Intent enableIntent = new Intent(requireContext(), QuickSettingsPreferencesActivity.class);
+                    startActivity(enableIntent);
+                    return true;
+                });
             }
 
             pref = findPreference("pref_category_sleepasandroid");
@@ -560,8 +567,7 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
             }
 
             if (contrastingSurfaces != null) {
-                contrastingSurfaces.setEnabled(!GBApplication.areDynamicColorsEnabled());
-                contrastingSurfaces.setChecked(GBApplication.areContrastingSurfacesEnabled());
+                contrastingSurfaces.setChecked(GBApplication.areContrastingSurfacesEnabled(GBApplication.isDarkThemeEnabled()));
                 contrastingSurfaces.setOnPreferenceChangeListener((preference, newVal) -> {
                     GBApplication.getPrefs().getPreferences().edit()
                             .putBoolean(GBApplication.PREF_CONTRASTING_SURFACES, (Boolean) newVal)
@@ -590,9 +596,6 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                                         .apply();
                             }
                             updateAccentColorSummary(accentColor);
-                        }
-                        if (contrastingSurfaces != null) {
-                            contrastingSurfaces.setEnabled(!val.equals(requireContext().getString(R.string.pref_theme_value_dynamic)));
                         }
                         // Warn user if dynamic colors are not available
                         if (val.equals(requireContext().getString(R.string.pref_theme_value_dynamic)) && !DynamicColors.isDynamicColorAvailable()) {
@@ -678,6 +681,17 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                     // In the niche case where the user happens to have several versions of CoMaps
                     // installed, and only grants permission to one, we still enable the option
                     return neededPermissions.size() < allPermissions.size();
+                });
+            }
+
+            pref = findPreference(GBPrefs.DEPRECATED_SMS_RECEIVER);
+            if (pref != null) {
+                pref.setOnPreferenceChangeListener((preference, newValue) -> {
+                    if ((boolean) newValue && ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(requireActivity(), new String[]{Manifest.permission.RECEIVE_SMS}, 0);
+                        return false;
+                    }
+                    return true;
                 });
             }
         }

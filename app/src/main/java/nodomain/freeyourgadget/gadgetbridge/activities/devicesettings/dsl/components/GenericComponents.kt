@@ -23,8 +23,8 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.ConfigureWorldClocks
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.InfoSetting
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.LabeledEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Language
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
@@ -32,6 +32,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListSe
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.MultiSelectSetting
 import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.GBLocationService
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
+import kotlin.Enum
 
 
 /**
@@ -136,26 +137,30 @@ inline fun <reified T> DeviceSettingsScope.multiEnumList(
     )
 }
 
-/**
- * A [nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ScreenSetting] for one
- * of the standard [DeviceSpecificSettingsScreen] entries.
- */
-fun DeviceSettingsScope.screen(
-    screen: DeviceSpecificSettingsScreen,
-    @DrawableRes icon: Int,
-    xmlSubScreens: List<Int> = emptyList(),
-    connectedOnly: Boolean = false,
-    visibleWhen: ((Prefs) -> Boolean)? = null,
-    block: DeviceSettingsScope.() -> Unit,
-) {
-    screen(
-        key = screen.key,
-        title = screen.title,
-        icon = icon,
-        xmlSubScreens = xmlSubScreens,
-        connectedOnly = connectedOnly,
-        visibleWhen = visibleWhen,
-        block = block,
+inline fun <reified T> DeviceSettingsScope.enumInfo(
+    key: String,
+    @StringRes title: Int,
+    @DrawableRes icon: Int = 0,
+    defaultValue: T? = null,
+    dependency: String? = null,
+    connectedOnly: Boolean = true,
+    noinline visibleWhen: ((Prefs) -> Boolean)? = null,
+) where T : Enum<T>, T : LabeledEntry {
+    val all = enumValues<T>()
+    items.add(
+        InfoSetting(
+            key = key,
+            title = title,
+            summaryProvider = { context, prefs ->
+                val valuePrefId = prefs.getString(key, null)
+                val value = all.firstOrNull { it.name.lowercase() == valuePrefId } ?: defaultValue
+                context.getString(value?.label ?: R.string.unknown)
+            },
+            icon = icon,
+            dependency = dependency,
+            connectedOnly = connectedOnly,
+            visibleWhen = visibleWhen,
+        )
     )
 }
 

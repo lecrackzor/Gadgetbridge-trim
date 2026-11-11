@@ -428,7 +428,7 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
     }
 
     private int getRangeDays() {
-        return GBApplication.getPrefs().getBoolean("charts_range", true) ? 30 : 7;
+        return GBApplication.getPrefs().getChartsRange().getDays();
     }
 
     @Override

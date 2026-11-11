@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminAuthExpiredActivity;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiHttpService;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiHttp;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminHttpRequest;
@@ -56,7 +56,7 @@ public class OauthInterceptor implements HttpInterceptor {
     @Override
     @Nullable
     public GarminHttpResponse handle(@NonNull final GarminHttpRequest request) {
-        if (request.getRawRequest().getMethod() != GdiHttpService.HttpService.Method.POST) {
+        if (request.getRawRequest().getMethod() != GdiHttp.RawResourceRequest.HTTPMethod.POST) {
             LOG.warn("Known OAuth requests should be POST");
             return null;
         }

@@ -49,6 +49,7 @@ import java.util.Stack;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
+import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.CatimaContentObserver;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.AlarmClockReceiver;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.BluetoothPairingRequestReceiver;
@@ -88,12 +89,14 @@ import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
  */
 class DeviceReceiversManager {
     enum Feature {
+        PHONE_CALLS,
         WEATHER,
         DATA_FETCHING,
         CALENDAR,
         MUSIC_INFO,
         NAVIGATION,
         SLEEP_AS_ANDROID,
+        LOYALTY_CARDS,
     }
 
     static class FeatureSet {
@@ -104,6 +107,9 @@ class DeviceReceiversManager {
         }
 
         public void logicalOr(final DeviceCoordinator operand, final GBDevice device) {
+            if (operand.supportsPhoneCalls(device)) {
+                features.add(Feature.PHONE_CALLS);
+            }
             if (operand.supportsCalendarEvents(device)) {
                 features.add(Feature.CALENDAR);
             }
@@ -121,6 +127,9 @@ class DeviceReceiversManager {
             }
             if (operand.supportsSleepAsAndroid(device)) {
                 features.add(Feature.SLEEP_AS_ANDROID);
+            }
+            if (operand.supportsLoyaltyCards(device)) {
+                features.add(Feature.LOYALTY_CARDS);
             }
         }
     }
@@ -149,6 +158,7 @@ class DeviceReceiversManager {
     private LineageOsWeatherReceiver mLineageOsWeatherReceiver = null;
     private TinyWeatherForecastGermanyReceiver mTinyWeatherForecastGermanyReceiver = null;
     private OmniJawsObserver mOmniJawsObserver = null;
+    private CatimaContentObserver mCatimaContentObserver = null;
 
     private final Stack<BroadcastReceiver> globalReceivers = new Stack<>();
     private GBLocationService locationService = null;
@@ -249,7 +259,7 @@ class DeviceReceiversManager {
         }
 
         if (enable) {
-            if (mPhoneCallReceiver == null) {
+            if (mPhoneCallReceiver == null && features.supports(Feature.PHONE_CALLS)) {
                 mPhoneCallReceiver = new PhoneCallReceiver();
                 IntentFilter filter = new IntentFilter();
                 filter.addAction("android.intent.action.PHONE_STATE");
@@ -257,10 +267,7 @@ class DeviceReceiversManager {
                 filter.addAction("nodomain.freeyourgadget.gadgetbridge.MUTE_CALL");
                 ContextCompat.registerReceiver(service, mPhoneCallReceiver, filter, ContextCompat.RECEIVER_EXPORTED);
             }
-            if (mSMSReceiver == null) {
-                mSMSReceiver = new SMSReceiver();
-                ContextCompat.registerReceiver(service, mSMSReceiver, new IntentFilter("android.provider.Telephony.SMS_RECEIVED"), ContextCompat.RECEIVER_EXPORTED);
-            }
+            updateSmsReceiver();
             if (mPebbleReceiver == null) {
                 mPebbleReceiver = new PebbleReceiver();
                 ContextCompat.registerReceiver(service, mPebbleReceiver, new IntentFilter("com.getpebble.action.SEND_NOTIFICATION"), ContextCompat.RECEIVER_EXPORTED);
@@ -355,6 +362,11 @@ class DeviceReceiversManager {
                 }
             }
 
+            if (features.supports(Feature.LOYALTY_CARDS) && mCatimaContentObserver == null) {
+                mCatimaContentObserver = new CatimaContentObserver(service);
+                mCatimaContentObserver.register();
+            }
+
             if (features.supports(Feature.DATA_FETCHING) && mGBAutoFetchReceiver == null) {
                 mGBAutoFetchReceiver = new GBAutoFetchReceiver();
                 ContextCompat.registerReceiver(service, mGBAutoFetchReceiver, new IntentFilter("android.intent.action.USER_PRESENT"), ContextCompat.RECEIVER_EXPORTED);
@@ -364,10 +376,7 @@ class DeviceReceiversManager {
                 service.unregisterReceiver(mPhoneCallReceiver);
                 mPhoneCallReceiver = null;
             }
-            if (mSMSReceiver != null) {
-                service.unregisterReceiver(mSMSReceiver);
-                mSMSReceiver = null;
-            }
+            updateSmsReceiver();
             if (mPebbleReceiver != null) {
                 service.unregisterReceiver(mPebbleReceiver);
                 mPebbleReceiver = null;
@@ -424,6 +433,10 @@ class DeviceReceiversManager {
                 mOsmandAidlHelper = null;
             }
             disableCoMapsReceivers();
+            if (mCatimaContentObserver != null) {
+                mCatimaContentObserver.unregister();
+                mCatimaContentObserver = null;
+            }
             if (mGBAutoFetchReceiver != null) {
                 service.unregisterReceiver(mGBAutoFetchReceiver);
                 mGBAutoFetchReceiver = null;
@@ -447,6 +460,12 @@ class DeviceReceiversManager {
                 && !prefs.getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, "").isEmpty();
     }
 
+    void refreshCatimaContentObserver() {
+        if (mCatimaContentObserver != null) {
+            mCatimaContentObserver.register();
+        }
+    }
+
     private void updateSleepAsAndroidReceiver() {
         final boolean wanted = shouldRegisterSleepAsAndroidReceiver(GBApplication.getPrefs(), mCurrentFeatureSet != null);
 
@@ -459,9 +478,22 @@ class DeviceReceiversManager {
         }
     }
 
+    private void updateSmsReceiver() {
+        final boolean wanted = mReceiversEnabled && GBApplication.getPrefs().getBoolean(GBPrefs.DEPRECATED_SMS_RECEIVER, false);
+
+        if (wanted && mSMSReceiver == null) {
+            mSMSReceiver = new SMSReceiver();
+            ContextCompat.registerReceiver(service, mSMSReceiver, new IntentFilter("android.provider.Telephony.SMS_RECEIVED"), ContextCompat.RECEIVER_EXPORTED);
+        } else if (!wanted && mSMSReceiver != null) {
+            service.unregisterReceiver(mSMSReceiver);
+            mSMSReceiver = null;
+        }
+    }
+
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         switch (key) {
             case GBPrefs.SLEEP_AS_ANDROID_ENABLED, GBPrefs.SLEEP_AS_ANDROID_DEVICE -> updateSleepAsAndroidReceiver();
+            case GBPrefs.DEPRECATED_SMS_RECEIVER -> updateSmsReceiver();
             case GBPrefs.NAVIGATION_APP_COMAPS -> {
                 if (mReceiversEnabled && mCurrentFeatureSet != null && mCurrentFeatureSet.supports(Feature.NAVIGATION)) {
                     boolean enable = sharedPreferences.getBoolean(GBPrefs.NAVIGATION_APP_COMAPS, false);

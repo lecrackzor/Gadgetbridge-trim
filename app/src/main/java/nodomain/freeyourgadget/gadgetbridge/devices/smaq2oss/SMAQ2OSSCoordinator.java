@@ -62,6 +62,21 @@ public class SMAQ2OSSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public boolean supportsFindDevice(@NonNull GBDevice device) {
         return true;
     }
@@ -73,8 +88,8 @@ public class SMAQ2OSSCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return SMAQ2OSSSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new SMAQ2OSSSupport();
     }
 
     @Override

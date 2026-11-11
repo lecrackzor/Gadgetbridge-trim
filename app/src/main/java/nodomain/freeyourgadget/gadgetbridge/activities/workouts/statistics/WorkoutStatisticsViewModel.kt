@@ -20,6 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryJsonSummary
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser
+import nodomain.freeyourgadget.gadgetbridge.util.DeviceHelper
 import org.slf4j.LoggerFactory
 import java.text.Collator
 import java.time.ZoneId
@@ -44,12 +45,13 @@ class WorkoutStatisticsViewModel : ViewModel() {
     private var summaries: List<BaseActivitySummary> = emptyList()
     private val workoutInputCache = ConcurrentHashMap<Int, List<WorkoutInput>>()
     private var loadJob: Job? = null
+    private var loading = false
 
     /**
      * Does nothing if loading already started.
      */
-    fun load(device: GBDevice) {
-        if (this.device != null) {
+    fun load(device: GBDevice?) {
+        if (loading) {
             return
         }
         this.device = device
@@ -60,8 +62,9 @@ class WorkoutStatisticsViewModel : ViewModel() {
         device?.let { startLoad(it) }
     }
 
-    private fun startLoad(device: GBDevice) {
+    private fun startLoad(device: GBDevice?) {
         loadJob?.cancel()
+        loading = true
         // Clear summaries before the cache, so that a running workoutInputs() does not cache old results
         summaries = emptyList()
         workoutInputCache.clear()
@@ -79,6 +82,7 @@ class WorkoutStatisticsViewModel : ViewModel() {
                     )
                 }
                 _state.value = StatisticsState.Ready(sports)
+                loading = false
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -108,11 +112,19 @@ class WorkoutStatisticsViewModel : ViewModel() {
 
         loadJob?.join()
 
-        val device = checkNotNull(device) { "load() must be called before overview()/period()" }
-        val parser = device.deviceCoordinator.getActivitySummaryParser(device, GBApplication.app())
         val source = summaries
         val inputs = withContext(Dispatchers.IO) {
-            source.filter { it.activityKind == kindCode }.map { workoutInput(parser, it) }
+            val parsers = mutableMapOf<Long, ActivitySummaryParser>()
+            source
+                .filter { it.activityKind == kindCode }
+                .mapNotNull { summary ->
+                    val gbDevice = DeviceHelper.getInstance().toGBDevice(summary.device)
+                        ?: return@mapNotNull null
+                    val parser = parsers.getOrPut(summary.deviceId) {
+                        gbDevice.deviceCoordinator.getActivitySummaryParser(gbDevice, GBApplication.app())
+                    }
+                    workoutInput(parser, summary)
+                }
         }
         if (summaries === source) {
             workoutInputCache[kindCode] = inputs
@@ -120,12 +132,17 @@ class WorkoutStatisticsViewModel : ViewModel() {
         return inputs
     }
 
-    private fun loadSummaries(device: GBDevice): List<BaseActivitySummary> {
+    private fun loadSummaries(device: GBDevice?): List<BaseActivitySummary> {
         return GBApplication.acquireDbReadOnly().use { dbHandler ->
-            val dbDevice = DBHelper.findDevice(device, dbHandler.daoSession)
-                ?: return@use emptyList<BaseActivitySummary>()
-            dbHandler.daoSession.baseActivitySummaryDao.queryBuilder()
-                .where(BaseActivitySummaryDao.Properties.DeviceId.eq(dbDevice.id))
+            val queryBuilder = dbHandler.daoSession.baseActivitySummaryDao.queryBuilder()
+
+            if (device != null) {
+                val dbDevice = DBHelper.findDevice(device, dbHandler.daoSession)
+                    ?: return@use emptyList()
+                queryBuilder.where(BaseActivitySummaryDao.Properties.DeviceId.eq(dbDevice.id))
+            }
+
+            queryBuilder
                 .orderAsc(BaseActivitySummaryDao.Properties.StartTime)
                 .list()
                 .filter { isStatisticsSport(ActivityKind.fromCode(it.activityKind)) }
@@ -187,6 +204,7 @@ class WorkoutStatisticsViewModel : ViewModel() {
 
     override fun onCleared() {
         loadJob?.cancel()
+        loading = false
     }
 
     companion object {

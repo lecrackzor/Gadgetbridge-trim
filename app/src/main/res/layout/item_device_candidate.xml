@@ -84,7 +84,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:textAppearance="?attr/textAppearanceLabelMedium"
-                    android:textColor="?attr/colorError"
+                    android:textColor="@color/device_candidate_status"
                     android:visibility="gone"
                     tools:text="@string/device_experimental"
                     tools:visibility="visible" />

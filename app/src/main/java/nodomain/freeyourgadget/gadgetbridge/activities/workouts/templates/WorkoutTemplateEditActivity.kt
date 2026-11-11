@@ -26,9 +26,12 @@ import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.appcompat.widget.Toolbar
+import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -54,6 +57,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editor
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.formatTypedValue
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.hideKeyboard
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWorkoutTemplateEditBinding
+import nodomain.freeyourgadget.gadgetbridge.databinding.WorkoutTemplateEditHeaderBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutEffort
@@ -88,9 +92,10 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
     private val viewModel: WorkoutTemplateEditViewModel by viewModels()
 
     private lateinit var binding: ActivityWorkoutTemplateEditBinding
+    private lateinit var header: WorkoutTemplateEditHeaderBinding
     private var nameEditor: TextValueEditor? = null
     private var noteEditor: TextValueEditor? = null
-    private var templateReady = false
+    private var actionBarShowsTemplateName = false
 
     /**
      * The exercise catalog, set once it is read. Reading it is slow, so a row shows
@@ -164,7 +169,8 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
         adapter = StepAdapter()
         binding.workoutTemplateStepList.apply {
             layoutManager = LinearLayoutManager(this@WorkoutTemplateEditActivity)
-            adapter = this@WorkoutTemplateEditActivity.adapter
+            header = WorkoutTemplateEditHeaderBinding.inflate(layoutInflater, this, false)
+            adapter = ConcatAdapter(HeaderAdapter(header.root), this@WorkoutTemplateEditActivity.adapter)
         }
         val touchHelper = ItemTouchHelper(StepDragCallback())
         touchHelper.attachToRecyclerView(binding.workoutTemplateStepList)
@@ -175,8 +181,13 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
         binding.workoutTemplateAddLeg.setOnClickListener { addLeg() }
         binding.workoutTemplateSave.setOnClickListener { trySave() }
 
-        onBackPressedDispatcher.addCallback(this) { confirmAndFinish() }
+        val confirmExitCallback = onBackPressedDispatcher.addCallback(this, enabled = false) {
+            confirmAndFinish()
+        }
 
+        lifecycleScope.launch {
+            viewModel.hasUnsavedChanges.collect { confirmExitCallback.isEnabled = it }
+        }
         lifecycleScope.launch {
             viewModel.rows.collect { rows -> adapter.submit(rows, viewModel.validate(spec)) }
         }
@@ -251,10 +262,23 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
                 spec.nameMaxLength
             ) {
                 viewModel.template.name = nameEditor?.value.orEmpty()
+                viewModel.refreshUnsavedChanges()
                 refreshNameError()
             }
             nameEditor = name
-            binding.workoutTemplateHeaderContainer.addView(name.view)
+            header.workoutTemplateHeaderContainer.addView(name.view)
+            binding.workoutTemplateStepList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    val headerRow = recyclerView.findViewHolderForAdapterPosition(0)?.itemView
+                    val hidden = headerRow == null ||
+                        headerRow.top + header.workoutTemplateHeaderContainer.top + name.view.bottom <= 0
+                    val showName = hidden && viewModel.template.name.isNotBlank()
+                    if (showName != actionBarShowsTemplateName) {
+                        actionBarShowsTemplateName = showName
+                        animateTitle()
+                    }
+                }
+            })
             val note = buildTextEditor(
                 this,
                 getString(R.string.note),
@@ -262,21 +286,68 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
                 spec.noteMaxLength
             ) {
                 viewModel.template.note = noteEditor?.value?.ifBlank { null }
+                viewModel.refreshUnsavedChanges()
             }
             noteEditor = note
-            binding.workoutTemplateHeaderContainer.addView(note.view)
+            header.workoutTemplateHeaderContainer.addView(note.view)
             bindOptionalFields()
         }
 
         if (!restored) viewModel.markBaseline()
-        templateReady = true
+    }
+
+    /**
+     * Shows the template name in the action bar while the name field is scrolled away, otherwise
+     * displays the sport.
+     */
+    private fun refreshTitle() {
+        val sport = viewModel.template.activityKind.getLabel(this)
+        if (actionBarShowsTemplateName) {
+            title = viewModel.template.name
+            supportActionBar?.subtitle = sport
+        } else {
+            title = sport
+            supportActionBar?.subtitle = null
+        }
+    }
+
+    /**
+     * Fades the action bar title out, sets it with [refreshTitle], and fades it in again.
+     * The title moves up or down to match the scroll direction.
+     */
+    private fun animateTitle() {
+        val toolbar = findViewById<Toolbar>(androidx.appcompat.R.id.action_bar)
+        if (toolbar == null) {
+            refreshTitle()
+            return
+        }
+        val shift = toolbar.height / 4f * if (actionBarShowsTemplateName) 1 else -1
+        val titleViews = toolbar.children.filterIsInstance<TextView>().toList()
+        titleViews.forEach { it.animate().cancel() }
+        val fadeOut = titleViews.map {
+            it.animate().alpha(0f).translationY(-shift).setDuration(TITLE_FADE_MILLIS)
+        }
+        val fadeIn = Runnable {
+            refreshTitle()
+            for (view in toolbar.children.filterIsInstance<TextView>()) {
+                view.alpha = 0f
+                view.translationY = shift
+                view.animate().alpha(1f).translationY(0f).setDuration(TITLE_FADE_MILLIS).start()
+            }
+        }
+        if (fadeOut.isEmpty()) {
+            fadeIn.run()
+            return
+        }
+        fadeOut.first().withEndAction(fadeIn)
+        fadeOut.forEach { it.start() }
     }
 
     /**
      * Asks for confirmation before leaving with unsaved changes.
      */
     private fun confirmAndFinish() {
-        if (!templateReady || !viewModel.hasUnsavedChanges()) {
+        if (!viewModel.hasUnsavedChanges.value) {
             finish()
             return
         }
@@ -293,8 +364,8 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
 
         val poolLengthCustomSpec = sportSpec?.poolLengthCustom
         if (poolLengthCustomSpec != null) {
-            val poolLengthContainer = binding.workoutTemplatePoolLengthContainer
-            val poolLengthCustomContainer = binding.workoutTemplatePoolLengthCustomContainer
+            val poolLengthContainer = header.workoutTemplatePoolLengthContainer
+            val poolLengthCustomContainer = header.workoutTemplatePoolLengthCustomContainer
 
             if (viewModel.template.poolLengthUnit == null) {
                 viewModel.template.poolLengthUnit = WorkoutPoolLengthUnit.UNSPECIFIED
@@ -310,6 +381,7 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
                 onChanged = { picked ->
                     viewModel.template.poolLengthUnit = picked
                     if (picked != WorkoutPoolLengthUnit.CUSTOM) viewModel.template.poolLength = null
+                    viewModel.refreshUnsavedChanges()
                     bindPoolLengthCustomField(poolLengthCustomContainer, poolLengthCustomSpec)
                 },
             )
@@ -317,13 +389,14 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
             bindPoolLengthCustomField(poolLengthCustomContainer, poolLengthCustomSpec)
         }
 
-        val transitionsBox = binding.workoutTemplateTransitionsCheckbox
+        val transitionsBox = header.workoutTemplateTransitionsCheckbox
         if (sportSpec?.transitions == true) {
             transitionsBox.visibility = View.VISIBLE
             transitionsBox.isChecked = viewModel.template.transitions == true
             transitionsBox.setOnCheckedChangeListener { _, checked ->
                 hideKeyboard(transitionsBox)
                 viewModel.template.transitions = checked
+                viewModel.refreshUnsavedChanges()
             }
         }
     }
@@ -344,7 +417,10 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
             spec,
             getString(R.string.workout_template_pool_length_custom_hint),
             viewModel.template.poolLength?.toLong()
-        )
+        ) {
+            viewModel.template.poolLength = poolLengthCustomEditor?.value?.toInt()
+            viewModel.refreshUnsavedChanges()
+        }
         poolLengthCustomEditor = editor
         container.addView(editor.view)
     }
@@ -454,6 +530,7 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
         if (viewModel.template.poolLengthUnit == WorkoutPoolLengthUnit.CUSTOM) {
             viewModel.template.poolLength = poolLengthCustomEditor?.value?.toInt()
         }
+        viewModel.refreshUnsavedChanges()
 
         val issues = viewModel.validate(spec)
         val nameIssue = refreshNameError(issues)
@@ -461,7 +538,7 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
             val firstStepIssue = issues.firstOrNull { it.nodeLocalId != null }
             if (firstStepIssue != null) {
                 val index = adapter.indexOf(firstStepIssue.nodeLocalId)
-                if (index >= 0) binding.workoutTemplateStepList.smoothScrollToPosition(index)
+                if (index >= 0) binding.workoutTemplateStepList.smoothScrollToPosition(HEADER_ROWS + index)
                 showValidationSnackbar()
             } else if (nameIssue != null) {
                 showValidationSnackbar()
@@ -583,6 +660,15 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
 
         override fun isLongPressDragEnabled(): Boolean = true
 
+        override fun getDragDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int =
+            if (viewHolder is StepAdapter.ViewHolder) super.getDragDirs(recyclerView, viewHolder) else 0
+
+        override fun canDropOver(
+            recyclerView: RecyclerView,
+            current: RecyclerView.ViewHolder,
+            target: RecyclerView.ViewHolder
+        ): Boolean = target is StepAdapter.ViewHolder
+
         override fun onMove(
             rv: RecyclerView,
             holder: RecyclerView.ViewHolder,
@@ -614,11 +700,11 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
             val movingUp = curY < selected.itemView.top
             val neighbor = (if (movingUp) adapter.blockBefore(block.first) else adapter.blockAfter(block.last))
                 ?: return null
-            val neighborFirst = rv.findViewHolderForAdapterPosition(neighbor.first) ?: return null
-            val neighborLast = rv.findViewHolderForAdapterPosition(neighbor.last) ?: return null
+            val neighborFirst = rv.findViewHolderForAdapterPosition(HEADER_ROWS + neighbor.first) ?: return null
+            val neighborLast = rv.findViewHolderForAdapterPosition(HEADER_ROWS + neighbor.last) ?: return null
             val neighborMiddle = (neighborFirst.itemView.top + neighborLast.itemView.bottom) / 2
             if (movingUp) return neighborFirst.takeIf { curY < neighborMiddle }
-            val blockLast = rv.findViewHolderForAdapterPosition(block.last) ?: return null
+            val blockLast = rv.findViewHolderForAdapterPosition(HEADER_ROWS + block.last) ?: return null
             val blockBottom = curY + blockLast.itemView.bottom - selected.itemView.top
             return neighborFirst.takeIf { blockBottom > neighborMiddle }
         }
@@ -704,8 +790,20 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
 
         private fun forEachGroupChild(recyclerView: RecyclerView, headerPosition: Int, action: (View) -> Unit) {
             for (childPosition in adapter.blockAt(headerPosition).drop(1)) {
-                recyclerView.findViewHolderForAdapterPosition(childPosition)?.let { action(it.itemView) }
+                recyclerView.findViewHolderForAdapterPosition(HEADER_ROWS + childPosition)?.let { action(it.itemView) }
             }
+        }
+    }
+
+    /**
+     * The template-level fields, as the first row of the step list.
+     */
+    private class HeaderAdapter(private val view: View) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        override fun getItemCount() = 1
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = object : RecyclerView.ViewHolder(view) {}
+
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         }
     }
 
@@ -1106,6 +1204,9 @@ class WorkoutTemplateEditActivity : AbstractGBActivity() {
         const val EXTRA_ACTIVITY_KIND = "workout_template_activity_kind"
         const val EXTRA_LEG = "workout_template_leg"
         const val RESULT_TEMPLATE_SAVED = 1
+
+        private const val HEADER_ROWS = 1
+        private const val TITLE_FADE_MILLIS = 120L
 
         private const val MENU_EDIT = 1
         private const val MENU_ADD_STEP_INSIDE = 2

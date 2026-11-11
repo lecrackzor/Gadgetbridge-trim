@@ -109,6 +109,13 @@
             tools:ignore="NewApi" />
 
         <Preference
+            android:fragment="nodomain.freeyourgadget.gadgetbridge.activities.debug.DashboardDebugFragment"
+            android:icon="@drawable/ic_dashboard"
+            android:key="pref_debug_dashboard"
+            android:persistent="false"
+            android:title="@string/bottom_nav_dashboard" />
+
+        <Preference
             android:fragment="nodomain.freeyourgadget.gadgetbridge.activities.debug.WidgetsDebugFragment"
             android:icon="@drawable/ic_widgets"
             android:key="pref_debug_widgets"

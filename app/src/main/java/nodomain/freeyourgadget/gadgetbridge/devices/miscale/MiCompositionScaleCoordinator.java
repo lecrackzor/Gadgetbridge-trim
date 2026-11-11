@@ -24,18 +24,13 @@ import androidx.annotation.NonNull;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-import de.greenrobot.dao.AbstractDao;
-import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.MiScaleWeightSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
-import nodomain.freeyourgadget.gadgetbridge.entities.MiScaleWeightSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
@@ -43,13 +38,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.miscale.MiCompositionScaleDeviceSupport;
 
 public class MiCompositionScaleCoordinator extends AbstractBLEDeviceCoordinator {
-    @Override
-    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(1);
-        map.put(session.getMiScaleWeightSampleDao(), MiScaleWeightSampleDao.Properties.DeviceId);
-        return map;
-    }
-
     @Override
     protected Pattern getSupportedDeviceName() {
         return Pattern.compile("MIBCS|MIBFS", Pattern.CASE_INSENSITIVE);
@@ -102,8 +90,8 @@ public class MiCompositionScaleCoordinator extends AbstractBLEDeviceCoordinator 
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return MiCompositionScaleDeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new MiCompositionScaleDeviceSupport();
     }
 
     @Override

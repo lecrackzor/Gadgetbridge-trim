@@ -23,9 +23,11 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.OppoMe
 
 public class AncConfigModule extends AbstractModule {
     private static final Logger LOG = LoggerFactory.getLogger(AncConfigModule.class);
+    private final boolean supportsLevel;
 
-    public AncConfigModule(@NonNull final Context context) {
+    public AncConfigModule(@NonNull final Context context, final boolean supportsLevel) {
         super(context);
+        this.supportsLevel = supportsLevel;
     }
 
     @NonNull
@@ -50,6 +52,13 @@ public class AncConfigModule extends AbstractModule {
 
     @NonNull
     public OppoMessage encodeSetMode(@NonNull final AncConfigValue value) {
+        LOG.debug("Send MODE = {}", value);
+        return encodeSet(AncConfigType.MODE, value.getCode());
+    }
+
+    @NonNull
+    public OppoMessage encodeSetMode(@NonNull final AncConfigValue.Level value) {
+        LOG.debug("Send MODE = {}", value);
         return encodeSet(AncConfigType.MODE, value.getCode());
     }
 
@@ -58,6 +67,7 @@ public class AncConfigModule extends AbstractModule {
         if (values.size() < 2) {
             throw new IllegalArgumentException("ANC cycle must contain at least 2 values");
         }
+        LOG.debug("Send TOUCH_CYCLE_MODES = {}", values);
         return encodeSet(AncConfigType.TOUCH_CYCLE_MODES, AncConfigValue.toMask(values));
     }
 
@@ -86,6 +96,20 @@ public class AncConfigModule extends AbstractModule {
 
         switch (type) {
             case MODE -> {
+                if (supportsLevel) {
+                    final AncConfigValue.Level value = AncConfigValue.Level.fromCode(valueCode);
+                    if (value != null) {
+                        LOG.debug("Got {} = {}", type, value);
+                        event.withPreference(OppoHeadphonesPreferences.ANC_SELECTOR, AncConfigValue.ON.getPrefId());
+                        event.withPreference(OppoHeadphonesPreferences.ANC_LEVEL_SELECTOR, value.getPrefId());
+                        break;
+                    }
+
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Unknown anc level value code 0x{}", OppoUtils.numberToHex(valueCode, 2));
+                    }
+                }
+
                 final AncConfigValue value = AncConfigValue.fromCode(valueCode);
                 if (value == null) {
                     LOG.warn("Unknown anc value code 0x{}", OppoUtils.numberToHex(valueCode, 2));
@@ -105,6 +129,16 @@ public class AncConfigModule extends AbstractModule {
                 final Set<String> valuePrefIds = AncConfigValue.toPrefIds(values);
                 event.withPreference(OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES, valuePrefIds);
             }
+            case DYNAMIC_LEVEL -> {
+                final AncConfigValue.Level value = AncConfigValue.Level.fromCode(valueCode);
+                if (value == null) {
+                    LOG.warn("Unknown anc level value code 0x{}", OppoUtils.numberToHex(valueCode, 2));
+                    break;
+                }
+
+                LOG.debug("Got {} = {} (DYNAMIC)", type, value);
+                event.withPreference(OppoHeadphonesPreferences.ANC_LEVEL_DYNAMIC, value.getPrefId());
+            }
             default -> {
                 LOG.debug("Unknown anc type code {}", typeCode);
             }
@@ -113,7 +147,6 @@ public class AncConfigModule extends AbstractModule {
     }
 
     private OppoMessage encodeSet(@NonNull final AncConfigType type, final int value) {
-        LOG.debug("Send {} = {}", type, value);
         final byte[] payload = new byte[]{
             (byte) type.getCode(),
             (byte) 0x01,

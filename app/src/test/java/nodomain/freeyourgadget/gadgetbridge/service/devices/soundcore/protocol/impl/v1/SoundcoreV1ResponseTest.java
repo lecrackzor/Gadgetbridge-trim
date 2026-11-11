@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -9,11 +10,15 @@ import java.nio.ByteOrder;
 
 import org.junit.Test;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizer;
+import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.aeroFit.SoundcoreAeroFitProtocol;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty.SoundcoreLibertyProtocol;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreAeroFit2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLiberty3ProCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreLibertyProtocol;
 
 public class SoundcoreV1ResponseTest {
     @Test
@@ -34,7 +39,7 @@ public class SoundcoreV1ResponseTest {
     public void handleBatteryInfoBuildsLeftAndRightForTwoBytePayload() {
         final TestProtocol protocol = new TestProtocol();
 
-        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{2, 3}, 20);
+        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{2, 3});
 
         assertEquals(2, events.length);
         assertEquals(40, ((GBDeviceEventBatteryInfo) events[0]).level);
@@ -45,7 +50,7 @@ public class SoundcoreV1ResponseTest {
     public void handleBatteryInfoBuildsLeftRightAndCaseForThreeBytePayload() {
         final TestProtocol protocol = new TestProtocol();
 
-        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{1, 2, 3}, 20);
+        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{1, 2, 3});
 
         assertEquals(3, events.length);
         assertEquals(1, ((GBDeviceEventBatteryInfo) events[0]).batteryIndex);
@@ -60,7 +65,7 @@ public class SoundcoreV1ResponseTest {
     public void handleBatteryInfoIgnoresBytesAfterCase() {
         final TestProtocol protocol = new TestProtocol();
 
-        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{1, 2, 3, 4, 5}, 20);
+        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{1, 2, 3, 4, 5});
 
         assertEquals(3, events.length);
         assertEquals(1, ((GBDeviceEventBatteryInfo) events[0]).batteryIndex);
@@ -76,7 +81,7 @@ public class SoundcoreV1ResponseTest {
         final TestProtocol protocol = new TestProtocol();
 
         for (final byte[] payload : new byte[][]{null, new byte[0], new byte[]{1}}) {
-            assertEquals(0, protocol.batteryInfo(payload, 20).length);
+            assertEquals(0, protocol.batteryInfo(payload).length);
             assertEquals(0, protocol.defaultBatteryInfo(payload).length);
         }
     }
@@ -115,13 +120,13 @@ public class SoundcoreV1ResponseTest {
     }
 
     @Test
-    public void libertyKeepsItsDistinctBatteryScalingAndInfoOffsets() {
+    public void libertyDecodesBatteryScalingAndOffsetSixDeviceInfo() {
         final TestLibertyProtocol protocol = new TestLibertyProtocol();
         final byte[] info = new byte[32];
         info[2] = 2;
         info[3] = 3;
-        putAscii(info, 6, "1.001");
-        putAscii(info, 11, "2.002");
+        putAscii(info, 6, "01.01");
+        putAscii(info, 11, "02.02");
         putAscii(info, 16, "1234567890123456");
 
         final GBDeviceEvent[] infoEvents = protocol.decodeResponse(
@@ -130,6 +135,10 @@ public class SoundcoreV1ResponseTest {
         assertEquals(3, infoEvents.length);
         assertEquals(40, ((GBDeviceEventBatteryInfo) infoEvents[0]).level);
         assertEquals(60, ((GBDeviceEventBatteryInfo) infoEvents[1]).level);
+        final GBDeviceEventVersionInfo versionInfo = (GBDeviceEventVersionInfo) infoEvents[2];
+        assertEquals("01.01", versionInfo.fwVersion);
+        assertEquals("02.02", versionInfo.fwVersion2);
+        assertEquals("1234567890123456", versionInfo.hwVersion);
 
         final GBDeviceEvent[] batteryEvents = protocol.decodeResponse(
                 devicePacket(SoundcoreProtocolImplV1.CMD_NOTIFY_BATTERY_INFO, new byte[]{1, 2, 3})
@@ -145,12 +154,14 @@ public class SoundcoreV1ResponseTest {
 
     @Test
     public void aeroFitKeepsItsOneBasedTenPercentBatteryEncoding() {
-        final TestAeroFitProtocol protocol = new TestAeroFitProtocol();
+        final GBDevice device = org.mockito.Mockito.mock(GBDevice.class);
+        org.mockito.Mockito.when(device.getDeviceCoordinator()).thenReturn(new SoundcoreAeroFit2Coordinator());
+        final SoundcoreProtocolImplV1 protocol = new SoundcoreAeroFit2Coordinator().createProtocol(device);
         final byte[] info = new byte[30];
         info[2] = 0;
         info[3] = 9;
-        putAscii(info, 4, "1.001");
-        putAscii(info, 9, "2.002");
+        putAscii(info, 4, "12.34");
+        putAscii(info, 9, "56.78");
         putAscii(info, 14, "1234567890123456");
 
         final GBDeviceEvent[] events = protocol.decodeResponse(
@@ -159,6 +170,42 @@ public class SoundcoreV1ResponseTest {
 
         assertEquals(10, ((GBDeviceEventBatteryInfo) events[0]).level);
         assertEquals(100, ((GBDeviceEventBatteryInfo) events[1]).level);
+    }
+
+    @Test
+    public void compactEqualizerResponseStoresPresetAndBands() {
+        final TestProtocol protocol = new TestProtocol();
+        protocol.decodeResponse(devicePacket((short) 0x8302, StringUtils.hexToBytes(
+                "040096966464788c96a078007a7c7477787a797d7800")));
+
+        assertNotNull(protocol.lastEqualizer);
+        assertEquals(4, protocol.lastEqualizer.getIndex());
+        assertArrayEquals(new int[]{3, 3, -2, -2, 0, 2, 3, 4, 0},
+                protocol.lastEqualizer.getBands());
+    }
+
+    @Test
+    public void compactEqualizerIgnoresAcknowledgementsAndTruncatedPayloads() {
+        final TestProtocol protocol = new TestProtocol();
+        for (int length = 0; length < 22; length++) {
+            protocol.decodeResponse(devicePacket((short) 0x8302, new byte[length]));
+            assertNull(protocol.lastEqualizer);
+        }
+    }
+
+    @Test
+    public void fullEqualizerResponseKeepsItsBandOffsetAndMinimumLength() {
+        final TestProtocol protocol = new TestProtocol();
+        protocol.decodeResponse(devicePacket(SoundcoreProtocolImplV1.CMD_SET_EQUALIZER, new byte[89]));
+        assertNull(protocol.lastEqualizer);
+        protocol.decodeResponse(devicePacket(SoundcoreProtocolImplV1.CMD_SET_EQUALIZER,
+                SoundcoreEqualizer.buildPayload(4,
+                        new int[]{3, 3, -2, -2, 0, 2, 3, 4}, new int[9])));
+
+        assertNotNull(protocol.lastEqualizer);
+        assertEquals(4, protocol.lastEqualizer.getIndex());
+        assertArrayEquals(new int[]{3, 3, -2, -2, 0, 2, 3, 4, 0},
+                protocol.lastEqualizer.getBands());
     }
 
     private static void putAscii(final byte[] target, final int offset, final String value) {
@@ -182,12 +229,25 @@ public class SoundcoreV1ResponseTest {
         return packet.array();
     }
 
+    private static GBDevice libertyDevice() {
+        final GBDevice device = org.mockito.Mockito.mock(GBDevice.class);
+        org.mockito.Mockito.when(device.getDeviceCoordinator()).thenReturn(new SoundcoreLiberty3ProCoordinator());
+        return device;
+    }
+
     private static final class TestProtocol extends SoundcoreProtocolImplV1 {
+        private SoundcoreEqualizer lastEqualizer;
+
+        @Override
+        protected void storeEqualizer(final SoundcoreEqualizer equalizer) {
+            lastEqualizer = equalizer;
+        }
+
         private short lastCommand;
         private int lastPayloadLength;
 
         private TestProtocol() {
-            super((GBDevice) null);
+            super(libertyDevice());
         }
 
         @Override
@@ -201,21 +261,16 @@ public class SoundcoreV1ResponseTest {
             return super.decodeBatteryInfo(payload);
         }
 
-        private GBDeviceEvent[] batteryInfo(final byte[] payload, final int multiplier) {
-            return handleBatteryInfo(payload, multiplier);
+        private GBDeviceEvent[] batteryInfo(final byte[] payload) {
+            return handleBatteryInfo(payload);
         }
 
     }
 
     private static final class TestLibertyProtocol extends SoundcoreLibertyProtocol {
         private TestLibertyProtocol() {
-            super((GBDevice) null);
+            super(libertyDevice());
         }
     }
 
-    private static final class TestAeroFitProtocol extends SoundcoreAeroFitProtocol {
-        private TestAeroFitProtocol() {
-            super((GBDevice) null);
-        }
-    }
 }

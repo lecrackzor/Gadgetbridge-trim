@@ -172,19 +172,6 @@ object WorkoutTemplateRepository {
         }
     }
 
-    /**
-     * Deletes every template of the device with [deviceId], with their steps.
-     */
-    fun deleteByDevice(session: DaoSession, deviceId: Long) {
-        val rows = session.workoutTemplateDao.queryBuilder()
-            .where(WorkoutTemplateDao.Properties.DeviceId.eq(deviceId))
-            .list()
-        for (row in rows) {
-            deleteSteps(session, row.id!!)
-            session.workoutTemplateDao.delete(row)
-        }
-    }
-
     private fun deleteSteps(session: DaoSession, templateId: Long) {
         session.workoutTemplateStepDao.queryBuilder()
             .where(WorkoutTemplateStepDao.Properties.TemplateId.eq(templateId))

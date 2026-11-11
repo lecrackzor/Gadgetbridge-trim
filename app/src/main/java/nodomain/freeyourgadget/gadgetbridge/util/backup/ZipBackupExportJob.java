@@ -40,7 +40,6 @@ import java.util.zip.ZipOutputStream;
 
 import nodomain.freeyourgadget.gadgetbridge.BuildConfig;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
-import nodomain.freeyourgadget.gadgetbridge.GBDatabaseManager;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
@@ -147,7 +146,8 @@ public class ZipBackupExportJob extends AbstractZipBackupJob {
             throw new IOException("Failed to export device preferences", e);
         }
 
-        for (final WidgetInstance widgetInstance : WidgetLayoutStore.INSTANCE.load()) {
+        final List<WidgetInstance> widgetInstances = WidgetLayoutStore.INSTANCE.instances();
+        for (final WidgetInstance widgetInstance : widgetInstances) {
             LOG.debug("Exporting widget preferences for {}", widgetInstance.getInstanceId());
             final SharedPreferences widgetPrefs = GBApplication.getWidgetSharedPrefs(widgetInstance.getInstanceId());
             if (widgetPrefs != null) {
@@ -176,7 +176,7 @@ public class ZipBackupExportJob extends AbstractZipBackupJob {
         final ZipEntry zipEntry = new ZipEntry(DATABASE_FILENAME);
         zipOut.putNextEntry(zipEntry);
 
-        GBDatabaseManager.exportDB(zipOut);
+        GBApplication.app().getDatabaseManager().exportDB(zipOut);
 
         zipOut.closeEntry();
     }

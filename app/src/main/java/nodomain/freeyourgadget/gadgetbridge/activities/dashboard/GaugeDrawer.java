@@ -156,9 +156,14 @@ public class GaugeDrawer {
         Ring(final ImageView gaugeBar, final Shape shape) {
             this.shape = shape;
             final ViewGroup.LayoutParams params = gaugeBar.getLayoutParams();
-            final int size = params != null && params.width > 0
-                ? params.width
-                : Math.round(RING_DEFAULT_SIZE_DP * gaugeBar.getResources().getDisplayMetrics().density);
+            final int size;
+            if (params != null && params.width > 0) {
+                size = params.width;
+            } else if (gaugeBar.getWidth() > 0) {
+                size = gaugeBar.getWidth();
+            } else {
+                size = Math.round(RING_DEFAULT_SIZE_DP * gaugeBar.getResources().getDisplayMetrics().density);
+            }
             scale = size / RING_DESIGN_SIZE;
             center = size / 2f;
             radius = RING_RADIUS * scale;

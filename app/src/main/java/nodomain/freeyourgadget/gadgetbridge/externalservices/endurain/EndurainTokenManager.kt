@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 Arjan Schrijver
+/*  Copyright (C) 2026 Arjan Schrijver, José Rebelo, Dany Mestas
 
     This file is part of Gadgetbridge.
 
@@ -17,80 +17,19 @@
 package nodomain.freeyourgadget.gadgetbridge.externalservices.endurain
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import nodomain.freeyourgadget.gadgetbridge.externalservices.OAuthTokenStore
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.security.GeneralSecurityException
 
-// FIXME MasterKey/EncryptedSharedPreferences is deprecated - we should move to Tink
-@Suppress("DEPRECATION")
-class EndurainTokenManager(context: Context) {
+class EndurainTokenManager(context: Context) : OAuthTokenStore(context, "endurain_tokens") {
     companion object {
         private val LOG: Logger = LoggerFactory.getLogger(EndurainTokenManager::class.java)
     }
 
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val sharedPreferences = createPreferences(context)
-
-    private fun createPreferences(context: Context): SharedPreferences {
-        return try {
-            EncryptedSharedPreferences.create(
-                context,
-                "endurain_tokens",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: GeneralSecurityException) {
-            LOG.warn("Unable to decrypt endurain token preferences, resetting them instead\n", e)
-            context.getSharedPreferences("endurain_tokens", Context.MODE_PRIVATE)
-                .edit(commit = true) { clear() }
-            EncryptedSharedPreferences.create(
-                context,
-                "endurain_tokens",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        }
-    }
-
-    fun saveTokens(accessToken: String, refreshToken: String, accessTokenExpiry: Int, refreshTokenExpiry: Int) {
-        val accessTokenExpiryTs = if (accessTokenExpiry < 1000000000) ((System.currentTimeMillis() / 1000) + accessTokenExpiry).toInt() else accessTokenExpiry
-        val refreshTokenExpiryTs = if (refreshTokenExpiry < 1000000000) ((System.currentTimeMillis() / 1000) + refreshTokenExpiry).toInt() else refreshTokenExpiry
-        sharedPreferences.edit {
-            putString("access_token", accessToken)
-                .putString("refresh_token", refreshToken)
-                .putInt("access_token_expires_at", accessTokenExpiryTs)
-                .putInt("refresh_token_expires_at", refreshTokenExpiryTs)
-        }
-    }
-
-    fun clearTokens() {
-        sharedPreferences.edit { clear() }
-    }
-
-    fun getAccessToken(): String? = sharedPreferences.getString("access_token", null)
-    fun getAccessTokenExpiresAt(): Int = sharedPreferences.getInt("access_token_expires_at", 0)
-    fun getRefreshToken(): String? = sharedPreferences.getString("refresh_token", null)
-    fun getRefreshTokenExpiresAt(): Int = sharedPreferences.getInt("refresh_token_expires_at", 0)
-
-    fun isLoggedIn(): Boolean {
-        return getRefreshToken() != null && !isRefreshTokenExpired()
-    }
-    fun isAccessTokenExpired(): Boolean {
-        return (System.currentTimeMillis() / 1000) >= getAccessTokenExpiresAt()
-    }
-    fun isRefreshTokenExpired(): Boolean {
-        return (System.currentTimeMillis() / 1000) >= getRefreshTokenExpiresAt()
-    }
-
+    /**
+     * Renews the token pair against [serverUrl], answering through [callback] whether it worked.
+     * Runs on a thread of its own.
+     */
     fun performTokenRefresh(
         serverUrl: String,
         callback: (Boolean) -> Unit
@@ -105,6 +44,7 @@ class EndurainTokenManager(context: Context) {
                         LOG.error("Token refresh failed: null response")
                         callback(false)
                     }
+
                     response.access_token != null -> {
                         LOG.info("Token refresh successful")
                         saveTokens(
@@ -115,8 +55,9 @@ class EndurainTokenManager(context: Context) {
                         )
                         callback(true)
                     }
+
                     else -> {
-                        LOG.error("Token refresh failed: ${response.detail}")
+                        LOG.error("Token refresh failed: {}", response.detail)
                         callback(false)
                     }
                 }

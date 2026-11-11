@@ -37,7 +37,7 @@ object HeartRateChartData {
         }
         return ChartSpec(
             series = listOf(
-                ChartSeries("hr", label, points, SeriesStyle.Line(color, curve = LineCurve.FLAT_AT_POINTS, maxGap = maxGapSeconds.toDouble())),
+                ChartSeries("hr", label, points, SeriesStyle.Line(color, filled = true, curve = LineCurve.FLAT_AT_POINTS, maxGap = maxGapSeconds.toDouble())),
             ),
             xAxis = AxisSpec(
                 format = ChartValueFormat.TIME_OF_DAY,

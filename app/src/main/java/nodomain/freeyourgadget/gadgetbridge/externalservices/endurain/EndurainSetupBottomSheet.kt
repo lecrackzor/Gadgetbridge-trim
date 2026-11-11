@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 Arjan Schrijver
+/*  Copyright (C) 2026 Arjan Schrijver, José Rebelo, Dany Mestas
 
     This file is part of Gadgetbridge.
 
@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.edit
@@ -74,7 +75,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                 activity?.runOnUiThread {
                     showProgress(false)
                     Toast.makeText(requireContext(),
-                        getString(R.string.endurain_sso_login_failed), Toast.LENGTH_SHORT).show()
+                        getString(R.string.service_sso_login_failed), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -91,6 +92,9 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
     )
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        view.findViewById<TextView>(R.id.title)?.text =
+            getString(R.string.service_setup_title, getString(EndurainService.nameRes))
+
         // Initialize views
         serverLayout = view.findViewById(R.id.server_layout)
         serverInput = view.findViewById(R.id.server_input)
@@ -106,12 +110,12 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
         progress = view.findViewById(R.id.progress)
         next = view.findViewById(R.id.next_button)
 
-        serverInput.setText(prefs.getString("endurain_server", ""))
+        serverInput.setText(EndurainService.serverUrl().orEmpty())
 
         // Register broadcast receiver for SSO callbacks
         LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
             ssoCallbackReceiver,
-            IntentFilter("nodomain.freeyourgadget.gadgetbridge.ENDURAIN_SSO_CALLBACK")
+            IntentFilter(EndurainService.SSO_CALLBACK_ACTION)
         )
 
         next.setOnClickListener {
@@ -161,7 +165,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                 } else {
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.endurain_no_sso_providers_available),
+                        getString(R.string.service_no_sso_providers_available),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -194,7 +198,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
             showProgress(false)
             Toast.makeText(
                 requireContext(),
-                getString(R.string.endurain_failed_to_open_browser, e.message),
+                getString(R.string.service_failed_to_open_browser, e.message),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -208,7 +212,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                 if (success) {
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.endurain_sso_login_successful),
+                        getString(R.string.service_sso_login_successful),
                         Toast.LENGTH_SHORT
                     ).show()
                     parentFragmentManager.setFragmentResult(
@@ -219,7 +223,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                 } else {
                     Toast.makeText(
                         requireContext(),
-                        getString(R.string.endurain_sso_login_failed),
+                        getString(R.string.service_sso_login_failed),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -230,13 +234,13 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
     private fun handleServerStep() {
         val uri = serverInput.text.toString().toUri()
         if (uri.scheme == null || uri.host == null) {
-            serverLayout.error = getString(R.string.endurain_invalid_server_url)
+            serverLayout.error = getString(R.string.service_invalid_server_url)
             return
         }
         serverLayout.error = null
         val server = "${uri.scheme}://${uri.host}${if (uri.port > 0) ":${uri.port}" else ""}"
         vm.server = server
-        prefs.edit { putString("endurain_server", server) }
+        prefs.edit { putString(EndurainService.serverPrefKey, server) }
 
         showProgress(true)
         vm.fetchServerCapabilities(server) { ok, reason ->
@@ -298,11 +302,11 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                         userLayout.visibility = View.GONE
                         passLayout.visibility = View.GONE
                         mfaLayout.visibility = View.VISIBLE
-                        next.text = getString(R.string.endurain_verify_mfa)
-                        GB.toast(getString(R.string.endurain_enter_your_mfa_code), Toast.LENGTH_SHORT, GB.INFO)
+                        next.text = getString(R.string.service_verify_mfa)
+                        GB.toast(getString(R.string.service_enter_your_mfa_code), Toast.LENGTH_SHORT, GB.INFO)
                     }
                     success -> {
-                        GB.toast(getString(R.string.endurain_login_successful), Toast.LENGTH_SHORT, GB.INFO)
+                        GB.toast(getString(R.string.service_login_successful), Toast.LENGTH_SHORT, GB.INFO)
                         // Send result to parent fragment
                         parentFragmentManager.setFragmentResult(
                             externalServiceLoginResultKey(EndurainService.id),
@@ -311,7 +315,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                         dismiss()
                     }
                     else -> {
-                        GB.toast(getString(R.string.endurain_login_failed), Toast.LENGTH_SHORT, GB.INFO)
+                        GB.toast(getString(R.string.service_login_failed), Toast.LENGTH_SHORT, GB.INFO)
                     }
                 }
             }
@@ -331,7 +335,7 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
             activity?.runOnUiThread {
                 showProgress(false)
                 if (success) {
-                    GB.toast(getString(R.string.endurain_mfa_verification_successful), Toast.LENGTH_SHORT, GB.INFO)
+                    GB.toast(getString(R.string.service_mfa_verification_successful), Toast.LENGTH_SHORT, GB.INFO)
                     // Send result to parent fragment
                     parentFragmentManager.setFragmentResult(
                         externalServiceLoginResultKey(EndurainService.id),
@@ -339,8 +343,8 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
                     )
                     dismiss()
                 } else {
-                    mfaLayout.error = getString(R.string.endurain_invalid_mfa_code)
-                    GB.toast(getString(R.string.endurain_mfa_verification_failed), Toast.LENGTH_SHORT, GB.INFO)
+                    mfaLayout.error = getString(R.string.service_invalid_mfa_code)
+                    GB.toast(getString(R.string.service_mfa_verification_failed), Toast.LENGTH_SHORT, GB.INFO)
                 }
             }
         }

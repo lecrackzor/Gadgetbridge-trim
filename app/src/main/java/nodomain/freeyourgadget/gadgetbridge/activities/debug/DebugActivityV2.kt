@@ -7,9 +7,11 @@ import androidx.fragment.app.FragmentManager
 import androidx.preference.PreferenceFragmentCompat
 import com.bytehamster.lib.preferencesearch.SearchPreferenceFragment
 import com.bytehamster.lib.preferencesearch.SearchPreferenceResult
+import dagger.hilt.android.AndroidEntryPoint
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractSettingsActivityV2
 
+@AndroidEntryPoint
 class DebugActivityV2 : AbstractSettingsActivityV2(), PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
     override fun newFragment(): PreferenceFragmentCompat? {
         return MainDebugFragment()
@@ -26,10 +28,7 @@ class DebugActivityV2 : AbstractSettingsActivityV2(), PreferenceFragmentCompat.O
         supportFragmentManager.popBackStack(SearchPreferenceFragment.TAG, FragmentManager.POP_BACK_STACK_INCLUSIVE)
 
         val fragment = screen.newFragment()
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.settings_container, fragment)
-            .addToBackStack(null)
-            .commit()
+        goToScreen(fragment, null, null)
         result.highlight(fragment)
     }
 
@@ -76,6 +75,11 @@ class DebugActivityV2 : AbstractSettingsActivityV2(), PreferenceFragmentCompat.O
                     R.xml.debug_preferences_preferences,
                     R.string.menuitem_settings,
                     ::PreferencesDebugFragment
+                ),
+                SearchableScreen(
+                    R.xml.debug_preferences_dashboard,
+                    R.string.bottom_nav_dashboard,
+                    ::DashboardDebugFragment
                 ),
                 SearchableScreen(
                     R.xml.debug_preferences_widgets,

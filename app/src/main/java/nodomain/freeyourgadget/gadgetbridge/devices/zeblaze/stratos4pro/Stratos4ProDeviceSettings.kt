@@ -32,7 +32,6 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Langua
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.PasswordMode
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.passwordScreen
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.sendAppNotifications
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.volume
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
@@ -69,9 +68,7 @@ internal fun stratos4ProDeviceSettings(
     device: GBDevice,
     coordinator: Stratos4ProCoordinator,
 ): DeviceSettingsSpec = deviceSettings {
-    screen(
-        DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
-        icon = R.drawable.ic_notifications,
+    DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.screen(
         // `c0 ab 0a`: SMS quick replies for a rejected call. `b2 ab 0a`: quick replies for
         // notifications. `ea`: off / always / scheduled + start/end.
         xmlSubScreens = listOf(
@@ -113,9 +110,7 @@ internal fun stratos4ProDeviceSettings(
 
     // `e1`: HR interval (0 = off), HR alerts, auto stress; `c4`: continuous SpO2, SpO2 alert,
     // scientific sleep, sedentary reminder.
-    screen(
-        DeviceSpecificSettingsScreen.HEALTH,
-        icon = R.drawable.ic_health,
+    DeviceSpecificSettingsScreen.HEALTH.screen(
         xmlSubScreens = listOf(R.xml.devicesettings_inactivity_sheduled),
     ) {
         list(
@@ -189,7 +184,7 @@ internal fun stratos4ProDeviceSettings(
     }
 
     // `c9`: automatic workout detection. `ec`: sport menu, once the watch has listed its sports.
-    screen(DeviceSpecificSettingsScreen.WORKOUT, icon = R.drawable.ic_activity_unknown_small) {
+    DeviceSpecificSettingsScreen.WORKOUT.screen {
         switchSetting(
             key = Stratos4ProSettings.PREF_WORKOUT_DETECTION,
             title = R.string.pref_workout_detection_title,
@@ -213,9 +208,7 @@ internal fun stratos4ProDeviceSettings(
     }
 
     // `a5`: raise to wake, screen timeout, language, password, brightness.
-    screen(
-        DeviceSpecificSettingsScreen.DISPLAY,
-        icon = R.drawable.ic_device_display,
+    DeviceSpecificSettingsScreen.DISPLAY.screen(
         xmlSubScreens = listOf(R.xml.devicesettings_screen_brightness),
     ) {
         switchSetting(
@@ -279,7 +272,7 @@ internal fun stratos4ProDeviceSettings(
     }
 
     // `a3 08` / `a3 04`: 12/24 h clock and day-month order.
-    screen(DeviceSpecificSettingsScreen.DATE_TIME, icon = R.drawable.ic_timer) {
+    DeviceSpecificSettingsScreen.DATE_TIME.screen {
         list(
             key = DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
             title = R.string.pref_title_timeformat,
@@ -299,13 +292,13 @@ internal fun stratos4ProDeviceSettings(
     }
 
     // `a5 ab 0e`: speaker volume 0..15 (media audio and mute have no GB pref).
-    screen(DeviceSpecificSettingsScreen.SOUND, icon = R.drawable.ic_volume_up) {
+    DeviceSpecificSettingsScreen.SOUND.screen {
         volume(max = 15, defaultValue = 11)
     }
 
     // `ed` world clocks, `a5 ab 0b` camera, `a5 ab 05` disconnect reminder, `c2` 0a wear hand,
     // `ca` morning report.
-    screen(DeviceSpecificSettingsScreen.GENERIC, icon = R.drawable.ic_settings) {
+    DeviceSpecificSettingsScreen.GENERIC.screen {
         externalSettings(
             key = DeviceSettingsPreferenceConst.PREF_WORLD_CLOCKS,
             title = R.string.pref_world_clocks_title,

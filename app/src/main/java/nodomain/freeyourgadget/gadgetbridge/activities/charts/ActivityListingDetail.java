@@ -16,10 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,8 +33,8 @@ import org.slf4j.LoggerFactory;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesChartFragment;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.model.ActivityListItem;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySession;
+import nodomain.freeyourgadget.gadgetbridge.util.FormatUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.dialogs.MaterialDialogFragment;
 
 public class ActivityListingDetail extends MaterialDialogFragment {
@@ -50,6 +53,11 @@ public class ActivityListingDetail extends MaterialDialogFragment {
         args.putParcelable(GBDevice.EXTRA_DEVICE, device);
         frag.setArguments(args);
         return frag;
+    }
+
+    @Override
+    protected int getThemeOverlay() {
+        return R.style.ThemeOverlay_App_MaterialAlertDialog_WindowBackground;
     }
 
     @Override
@@ -85,24 +93,27 @@ public class ActivityListingDetail extends MaterialDialogFragment {
             .commit();
         activitySummariesChartFragment.setDateAndGetData(null, gbDevice, tsFrom, tsTo);
 
-        View activityItem = view.findViewById(R.id.activityItemHolder);
-        ActivityListItem activityListItem = new ActivityListItem(activityItem);
-        activityListItem.update(
-            item.getStartTime(),
-            item.getEndTime(),
-            item.getActivityKind(),
-            null,
-            item.getActiveSteps(),
-            item.getDistance(),
-            item.getHeartRateAverage(),
-            item.getIntensity(),
-            item.getEndTime().getTime() - item.getStartTime().getTime(),
-            false,
-            false,
-            null,
-            null,
-            false,
-            false
-        );
+        final Context context = requireContext();
+        final ImageView iconView = view.findViewById(R.id.activity_detail_icon);
+        iconView.setImageResource(item.getActivityKind().getIcon());
+        ((TextView) view.findViewById(R.id.activity_detail_name)).setText(item.getActivityKind().getLabel(context));
+        ((TextView) view.findViewById(R.id.activity_detail_meta)).setText(ActivityListingViews.formatMeta(context, item));
+
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_duration), R.drawable.ic_access_time, ActivityListingViews.formatDuration(item), R.string.activity_detail_duration_label);
+        final int steps = item.getActiveSteps();
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_steps), R.drawable.ic_steps, steps > 0 ? String.valueOf(steps) : "-", R.string.steps);
+        final int hr = item.getHeartRateAverage();
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_avg_hr), R.drawable.ic_heartrate, hr > 0 ? context.getString(R.string.bpm_value_unit, hr) : "-", R.string.averageHR);
+        final float distance = item.getDistance();
+        final View distanceTile = view.findViewById(R.id.activity_detail_tile_distance);
+        if (distance > 0) {
+            ActivityListingViews.fillTile(distanceTile, R.drawable.ic_distance, FormatUtils.getFormattedDistanceLabel(distance), R.string.distance);
+        }
+        distanceTile.setVisibility(distance > 0 ? View.VISIBLE : View.INVISIBLE);
+        final float intensity = item.getIntensity();
+        if (intensity >= 1f) {
+            ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_intensity), R.drawable.ic_intensity, String.valueOf(Math.round(intensity)), R.string.movement_intensity);
+        }
+        view.findViewById(R.id.activity_detail_tiles_extra).setVisibility(intensity >= 1f ? View.VISIBLE : View.GONE);
     }
 }

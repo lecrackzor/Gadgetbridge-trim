@@ -25,16 +25,11 @@ import org.slf4j.LoggerFactory;
 
 import androidx.annotation.NonNull;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-import de.greenrobot.dao.AbstractDao;
-import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.Casio2C2DDeviceCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.entities.CasioGBX100ActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -108,13 +103,6 @@ public class CasioGBX100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     }
 
     @Override
-    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(1);
-        map.put(session.getCasioGBX100ActivitySampleDao(), CasioGBX100ActivitySampleDao.Properties.DeviceId);
-        return map;
-    }
-
-    @Override
     public int[] getSupportedDeviceSpecificSettings(GBDevice device) {
         return new int[]{
                 R.xml.devicesettings_find_phone,
@@ -133,12 +121,22 @@ public class CasioGBX100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return CasioGBX100DeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new CasioGBX100DeviceSupport();
     }
 
     @Override
     public int getDeviceNameResource() {
         return R.string.devicetype_casiogbx100;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
     }
 }

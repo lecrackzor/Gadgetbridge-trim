@@ -86,10 +86,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     protected void init() {
         GBPrefs prefs = GBApplication.getPrefs();
 
-        if (prefs.getBoolean("charts_range", true))
-            totalDays = 30;
-        else
-            totalDays = 7;
+        totalDays = prefs.getChartsRange().getDays();
 
         weightUnit = prefs.getWeightUnit();
 

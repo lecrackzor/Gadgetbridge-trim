@@ -256,5 +256,26 @@
     "type": "Apache 2.0",
     "url": "https://github.com/zxing/zxing",
     "path": "licenses/zxing.txt"
+  },
+  {
+    "name": "Coil",
+    "owner": "Coil Contributors",
+    "type": "Apache 2.0",
+    "url": "https://github.com/coil-kt/coil",
+    "path": "licenses/apache-2.0.txt"
+  },
+  {
+    "name": "AndroidX Media3",
+    "owner": "Google",
+    "type": "Apache 2.0",
+    "url": "https://github.com/androidx/media",
+    "path": "licenses/apache-2.0.txt"
+  },
+  {
+    "name": "fit-route",
+    "owner": "Nick Holloway",
+    "type": "MIT",
+    "url": "https://gitlab.com/nwholloway/fit-route",
+    "path": "licenses/fit-route.txt"
   }
 ]

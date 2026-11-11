@@ -68,6 +68,27 @@ class DeviceSettingsScope {
         )
     }
 
+    /**
+     * A [ScreenSetting] for one of the standard [DeviceSpecificSettingsScreen] entries.
+     */
+    fun DeviceSpecificSettingsScreen.screen(
+        @DrawableRes icon: Int = this.icon,
+        xmlSubScreens: List<Int> = emptyList(),
+        connectedOnly: Boolean = false,
+        visibleWhen: ((Prefs) -> Boolean)? = null,
+        block: DeviceSettingsScope.() -> Unit,
+    ) {
+        this@DeviceSettingsScope.screen(
+            key = key,
+            title = title,
+            icon = icon,
+            xmlSubScreens = xmlSubScreens,
+            connectedOnly = connectedOnly,
+            visibleWhen = visibleWhen,
+            block = block,
+        )
+    }
+
     fun switchSetting(
         key: String,
         @StringRes title: Int,
@@ -82,6 +103,7 @@ class DeviceSettingsScope {
         @StringRes confirmationMessage: Int = 0,
         connectedOnly: Boolean = true,
         visibleWhen: ((Prefs) -> Boolean)? = null,
+        onSharedPreferenceChanged: ((Boolean) -> Unit)? = null,
     ) {
         items.add(
             SwitchSetting(
@@ -98,6 +120,7 @@ class DeviceSettingsScope {
                 confirmationMessage = confirmationMessage,
                 connectedOnly = connectedOnly,
                 visibleWhen = visibleWhen,
+                onSharedPreferenceChanged = onSharedPreferenceChanged,
             )
         )
     }
@@ -193,6 +216,8 @@ class DeviceSettingsScope {
         dependency: String? = null,
         connectedOnly: Boolean = true,
         visibleWhen: ((Prefs) -> Boolean)? = null,
+        onSharedPreferenceChanged: ((Set<String>) -> Unit)? = null,
+        entryGroups: List<ListEntryGroup> = emptyList(),
     ) {
         items.add(
             MultiSelectSetting(
@@ -206,6 +231,8 @@ class DeviceSettingsScope {
                 dependency = dependency,
                 connectedOnly = connectedOnly,
                 visibleWhen = visibleWhen,
+                onSharedPreferenceChanged = onSharedPreferenceChanged,
+                entryGroups = entryGroups,
             )
         )
     }

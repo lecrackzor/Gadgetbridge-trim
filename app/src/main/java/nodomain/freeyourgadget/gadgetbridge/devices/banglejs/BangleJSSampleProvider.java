@@ -32,6 +32,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BangleJSActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 
 public class BangleJSSampleProvider extends AbstractSampleProvider<BangleJSActivitySample> {
     private static final Logger LOG = LoggerFactory.getLogger(BangleJSSampleProvider.class);
@@ -118,8 +119,11 @@ public class BangleJSSampleProvider extends AbstractSampleProvider<BangleJSActiv
         if (sample.getSteps() != 0) {
             nearestSample.setSteps(sample.getSteps());
         }
-        if (sample.getRawIntensity() != 0) {
+        if (sample.getRawIntensity() != 0 && sample.getRawIntensity() != ActivitySample.NOT_MEASURED) {
             nearestSample.setRawIntensity(sample.getRawIntensity());
+        }
+        if (sample.getRawKind() != ActivityKind.UNKNOWN.getCode()) {
+            nearestSample.setRawKind(sample.getRawKind());
         }
 
         addGBActivitySample(nearestSample);

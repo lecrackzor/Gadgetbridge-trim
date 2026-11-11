@@ -123,7 +123,7 @@ public class RespiratoryRatePeriodFragment extends RespiratoryRateFragment<Respi
         }
         final String awakeLabel = getString(R.string.sleep_colored_stats_awake_avg);
         final String sleepLabel = getString(R.string.sleep_avg);
-        final int awakeColor = getResources().getColor(R.color.respiratory_rate_color);
+        final int awakeColor = getResources().getColor(R.color.chart_awake_sleep_light);
         final int sleepColor = getResources().getColor(R.color.chart_light_sleep_light);
         final ChartSpec spec = RespiratoryRateChartData.periodSpec(epochDays, awake, sleep, awakeLabel, awakeColor, sleepLabel, sleepColor);
         final List<Function1<Integer, String>> rowTexts = new ArrayList<>();

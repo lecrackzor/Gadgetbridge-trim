@@ -108,6 +108,11 @@ public class AmazfitBip3Coordinator extends HuamiCoordinator {
     }
 
     @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public DeviceSpecificSettings getDeviceSpecificSettings(final GBDevice device) {
         final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
 
@@ -174,8 +179,8 @@ public class AmazfitBip3Coordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return AmazfitBip3Support.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new AmazfitBip3Support();
     }
 
     @Override

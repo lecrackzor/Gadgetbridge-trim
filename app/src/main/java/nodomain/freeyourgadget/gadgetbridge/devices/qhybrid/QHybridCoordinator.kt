@@ -24,8 +24,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelUuid
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity
@@ -39,8 +37,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.HybridHRActivitySample
-import nodomain.freeyourgadget.gadgetbridge.entities.HybridHRActivitySampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.HybridHRSpo2SampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser
@@ -58,18 +54,6 @@ import java.io.File
 import java.io.IOException
 
 class QHybridCoordinator : AbstractBLEDeviceCoordinator() {
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>?, Property?> {
-        return object : HashMap<AbstractDao<*, *>?, Property?>() {
-            init {
-                put(
-                    session.hybridHRActivitySampleDao,
-                    HybridHRActivitySampleDao.Properties.DeviceId
-                )
-                put(session.hybridHRSpo2SampleDao, HybridHRSpo2SampleDao.Properties.DeviceId)
-            }
-        }
-    }
-
     override fun supports(candidate: GBDeviceCandidate): Boolean {
         for (uuid in candidate.serviceUuids) {
             if (uuid.uuid.toString() == "3dda0001-957f-7d4a-34a6-74696673696d") {
@@ -124,6 +108,7 @@ class QHybridCoordinator : AbstractBLEDeviceCoordinator() {
         return HybridHRSpo2SampleProvider(device, session)
     }
 
+    @Suppress("DEPRECATION")
     override fun findInstallHandler(uri: Uri, options: Bundle, context: Context): InstallHandler? {
         if (this.isHybridHR) {
             val installHandler = FossilHRInstallHandler(uri, context)
@@ -244,10 +229,11 @@ class QHybridCoordinator : AbstractBLEDeviceCoordinator() {
         return QHybridSettingsCustomizer()
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return QHybridSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return QHybridSupport()
     }
 
+    @Suppress("DEPRECATION")
     override fun getSupportedDeviceSpecificAuthenticationSettings(): IntArray {
         return if (this.isHybridHR) {
             intArrayOf(
@@ -303,6 +289,18 @@ class QHybridCoordinator : AbstractBLEDeviceCoordinator() {
     }
 
     override fun supportsNavigation(device: GBDevice): Boolean {
+        return isHybridHR(device)
+    }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
+
+    override fun supportsSmsReply(device: GBDevice): Boolean = isHybridHR(device)
+
+    override fun supportsMusicInfo(device: GBDevice): Boolean {
         return isHybridHR(device)
     }
 

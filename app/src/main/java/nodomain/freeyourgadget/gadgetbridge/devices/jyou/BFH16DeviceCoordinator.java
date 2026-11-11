@@ -75,6 +75,16 @@ public class BFH16DeviceCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public boolean supportsHeartRateMeasurement(GBDevice device) {
         return true;
     }
@@ -86,8 +96,8 @@ public class BFH16DeviceCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return BFH16DeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new BFH16DeviceSupport();
     }
 
     @Override

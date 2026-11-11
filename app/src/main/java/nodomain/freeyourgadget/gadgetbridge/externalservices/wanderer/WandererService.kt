@@ -24,18 +24,11 @@ import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
 
 object WandererService : ExternalService {
     override val id = "wanderer"
-    override val nameRes = R.string.pref_category_wanderer
+    override val nameRes = R.string.service_name_wanderer
     override val authStyle = AuthStyle.API_TOKEN
 
     override fun isLoggedIn(context: Context) =
         serverUrl() != null && WandererTokenManager(context).isLoggedIn()
-
-    override fun statusSummary(context: Context): CharSequence =
-        if (isLoggedIn(context)) {
-            context.getString(R.string.wanderer_logged_in, serverUrl())
-        } else {
-            context.getString(R.string.endurain_not_logged_in_integration_disabled)
-        }
 
     override fun showSetup(fragment: Fragment) {
         WandererSetupBottomSheet().show(fragment.parentFragmentManager, "wanderer_setup")

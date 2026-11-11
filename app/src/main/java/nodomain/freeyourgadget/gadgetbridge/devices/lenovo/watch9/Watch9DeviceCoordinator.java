@@ -85,8 +85,8 @@ public class Watch9DeviceCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return Watch9DeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new Watch9DeviceSupport();
     }
 
     @Override
@@ -108,5 +108,15 @@ public class Watch9DeviceCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public DeviceKind getDeviceKind(@NonNull GBDevice device) {
         return DeviceKind.WATCH;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
     }
 }

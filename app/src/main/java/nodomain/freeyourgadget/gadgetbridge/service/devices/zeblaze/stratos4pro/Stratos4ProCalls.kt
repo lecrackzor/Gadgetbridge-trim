@@ -31,6 +31,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.CallSpec
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder
 import nodomain.freeyourgadget.gadgetbridge.service.devices.zeblaze.stratos4pro.Stratos4ProSupport.Companion.CALLER_NOTICE_ID
 import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
@@ -527,7 +528,7 @@ internal class Stratos4ProCalls(support: Stratos4ProSupport) : Stratos4ProFeatur
         if (audioReceiver != null) return
         audioReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                val btDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                val btDevice = intent.getParcelableCompat<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                 if (btDevice == null || !btDevice.address.equals(device.address, ignoreCase = true)) {
                     return
                 }

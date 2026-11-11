@@ -40,4 +40,9 @@ public class MiBand11Coordinator extends MiBand10Coordinator {
     protected Pattern getSupportedDeviceName() {
         return Pattern.compile("^Xiaomi Smart Band 11 [0-9A-F]{4}$");
     }
+
+    @Override
+    public boolean isExperimental() {
+        return true;
+    }
 }

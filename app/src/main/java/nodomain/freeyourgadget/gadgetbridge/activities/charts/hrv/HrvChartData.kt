@@ -17,12 +17,14 @@ object HrvChartData {
         epochDays: LongArray,
         dayAvg: IntArray,
         lastNight: IntArray,
+        weeklyAvg: IntArray,
         dayMin: IntArray,
         dayMax: IntArray,
         baselineLow: IntArray,
         baselineHigh: IntArray,
         showDayAvg: Boolean,
         showLastNight: Boolean,
+        showWeeklyAvg: Boolean,
         showDayRange: Boolean,
         labels: Array<String>,
         colors: IntArray,
@@ -41,6 +43,7 @@ object HrvChartData {
         val series = listOfNotNull(
             line("day_avg", 0, linePoints(dayAvg)).takeIf { showDayAvg },
             line("last_night", 1, linePoints(lastNight)).takeIf { showLastNight },
+            line("weekly_avg", 4, linePoints(weeklyAvg)).takeIf { showWeeklyAvg },
             ChartSeries("day_range", labels[2], rangePoints(dayMin, dayMax), SeriesStyle.Range(colors[2], DAY_RANGE_WIDTH))
                 .takeIf { showDayRange },
             ChartSeries("baseline", labels[3], rangePoints(baselineLow, baselineHigh), SeriesStyle.Range(colors[3])),

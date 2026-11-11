@@ -25,22 +25,26 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Looper;
 import android.os.SystemClock;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.GravityCompat;
-import androidx.core.view.MenuProvider;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -61,20 +65,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.data.DashboardPreferences;
 import nodomain.freeyourgadget.gadgetbridge.activities.debug.DebugActivityV2;
 import nodomain.freeyourgadget.gadgetbridge.activities.discovery.DiscoveryActivityV2;
 import nodomain.freeyourgadget.gadgetbridge.activities.welcome.WelcomeActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutListFragment;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
+import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
@@ -82,11 +94,10 @@ import nodomain.freeyourgadget.gadgetbridge.util.DeviceHelper;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBChangeLog;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
-import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
 
 //TODO: extend AbstractGBActivity, but it requires actionbar that is not available
 public class ControlCenterv2 extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, GBActivity {
+        implements NavigationView.OnNavigationItemSelectedListener, GBActivity, DashboardHost {
     private static final Logger LOG = LoggerFactory.getLogger(ControlCenterv2.class);
     public static final long REALTIME_HR_SAMPLE_TTL_MS = 5_000L;
     public static final int MENU_REFRESH_CODE = 1;
@@ -98,6 +109,39 @@ public class ControlCenterv2 extends AppCompatActivity
     private AlertDialog clDialog;
     private BarShade.ScrollListener barShades;
     private View toolbarShade;
+    private View mainContent;
+    private BottomNavigationView navigationView;
+    private boolean bottomNavigationEnabled;
+    private boolean pageBottomBarShown;
+
+    enum NavTab {
+        DASHBOARD("dashboard", R.id.bottom_nav_dashboard, R.string.bottom_nav_dashboard, R.drawable.ic_dashboard),
+        WORKOUTS("workouts",   R.id.bottom_nav_workouts,  R.string.bottom_nav_workouts,  R.drawable.ic_activity_running),
+        DEVICES("devices",     R.id.bottom_nav_devices,   R.string.bottom_nav_devices,   R.drawable.ic_devices_other);
+
+        final String key; final int itemId, titleRes, iconRes;
+        NavTab(String key, int itemId, int titleRes, int iconRes) {
+            this.key = key; this.itemId = itemId; this.titleRes = titleRes; this.iconRes = iconRes;
+        }
+        static NavTab fromKey(String key) {
+            for (NavTab t : values()) if (t.key.equals(key)) return t;
+            return null;
+        }
+        static NavTab fromItemId(int itemId) {
+            for (NavTab t : values()) if (t.itemId == itemId) return t;
+            return null;
+        }
+    }
+    private final List<NavTab> visibleTabs = new ArrayList<>();
+    private boolean rebuildingNav = false;
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (p, key) -> {
+        if ("main_screens".equals(key)) {
+            if (rebuildBottomNav()) {
+                updateBottomNavigationVisibility();
+            }
+        }
+    };
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -123,47 +167,142 @@ public class ControlCenterv2 extends AppCompatActivity
                         swipeLayout.setRefreshing(false);
                     }
                     break;
+                case DeviceManager.ACTION_DEVICES_CHANGED:
+                    LOG.debug("Devices changed, {} devices", GBApplication.app().getDeviceManager().getDevices().size());
+                    if (rebuildBottomNav()) {
+                        updateBottomNavigationVisibility();
+                    }
+                    break;
             }
         }
     };
-    private boolean pesterWithPermissions = true;
-    private final Map<GBDevice, ActivitySample> currentHRSample = new HashMap<>();
-    private final Map<GBDevice, Long> currentHRSampleReceivedAt = new HashMap<>();
 
-    public ActivitySample getCurrentHRSample(final GBDevice device) {
-        final ActivitySample sample = currentHRSample.get(device);
+    private final Map<GBDevice, Integer> currentHeartRate = new HashMap<>();
+    private final Map<GBDevice, Long> currentHeartRateReceivedAt = new HashMap<>();
+
+    @Nullable
+    public Integer getCurrentHeartRate(final GBDevice device) {
+        final Integer heartRate = currentHeartRate.get(device);
 
         if (!device.getDeviceCoordinator().supportsLiveOnlyHeartRateDisplay(device)) {
-            return sample;
+            return heartRate;
         }
 
-        final Long receivedAt = currentHRSampleReceivedAt.get(device);
+        final Long receivedAt = currentHeartRateReceivedAt.get(device);
 
-        if (sample == null || receivedAt == null) {
+        if (heartRate == null || receivedAt == null) {
             return null;
         }
 
         if (SystemClock.elapsedRealtime() - receivedAt > REALTIME_HR_SAMPLE_TTL_MS) {
-            currentHRSample.remove(device);
-            currentHRSampleReceivedAt.remove(device);
+            currentHeartRate.remove(device);
+            currentHeartRateReceivedAt.remove(device);
             return null;
         }
 
-        return sample;
+        return heartRate;
     }
 
-    private void setCurrentHRSample(final GBDevice device, ActivitySample sample) {
-        if (HeartRateUtils.getInstance().isValidHeartRateValue(sample.getHeartRate())) {
-            currentHRSample.put(device, sample);
-            currentHRSampleReceivedAt.put(device, SystemClock.elapsedRealtime());
+    private void setCurrentHeartRate(final GBDevice device, final int heartRate) {
+        if (HeartRateUtils.getInstance().isValidHeartRateValue(heartRate)) {
+            currentHeartRate.put(device, heartRate);
+            currentHeartRateReceivedAt.put(device, SystemClock.elapsedRealtime());
         }
     }
 
-    private void handleRealtimeSample(final GBDevice device, Serializable extra) {
-        if (extra instanceof ActivitySample) {
-            ActivitySample sample = (ActivitySample) extra;
-            setCurrentHRSample(device, sample);
+    private void handleRealtimeSample(final GBDevice device, final Serializable extra) {
+        // Depending on the device, a realtime sample can be an ActivitySample or a HeartRateSample
+        if (extra instanceof HeartRateSample) {
+            setCurrentHeartRate(device, ((HeartRateSample) extra).getHeartRate());
+        } else if (extra instanceof ActivitySample) {
+            setCurrentHeartRate(device, ((ActivitySample) extra).getHeartRate());
         }
+    }
+
+    /**
+     * Rebuilds the bottom navigation tabs from the preferences and the paired devices.
+     *
+     * @return true if the visible tabs have changed
+     */
+    private boolean rebuildBottomNav() {
+        boolean supportsActivityTracking = false;
+        boolean supportsRecordedActivities = false;
+
+        // Determine availability of device with activity tracking and/or recording functionality
+        List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
+        for (GBDevice dev : devices) {
+            if (dev.getDeviceCoordinator().supportsActivityTracking(dev)) {
+                supportsActivityTracking = true;
+            }
+            if (dev.getDeviceCoordinator().supportsRecordedActivities(dev)) {
+                supportsRecordedActivities = true;
+            }
+            if (supportsActivityTracking && supportsRecordedActivities) break;
+        }
+
+        GBPrefs prefs = GBApplication.getPrefs();
+        List<String> mainScreensPref = prefs.getList("main_screens", Arrays.asList("dashboard", "workouts", "devices"));
+        final List<NavTab> tabs = new ArrayList<>();
+        Set<NavTab> seen = EnumSet.noneOf(NavTab.class);
+        for (String token : mainScreensPref) {
+            NavTab tab = NavTab.fromKey(token.trim());
+            if (tab == null || !seen.add(tab)) continue;
+            if (tab == NavTab.DASHBOARD && !supportsActivityTracking) continue;
+            if (tab == NavTab.WORKOUTS && !supportsRecordedActivities) continue;
+            tabs.add(tab);
+        }
+
+        // Fallback: Devices is always available, so the bar is never empty
+        if (tabs.isEmpty()) {
+            tabs.add(NavTab.DEVICES);
+        }
+
+        if (tabs.equals(visibleTabs)) {
+            // If nothing changed, don't do anything
+            return false;
+        }
+
+        BottomNavigationView nav = findViewById(R.id.bottom_nav_bar);
+        int selectedId = nav.getSelectedItemId();
+        Menu menu = nav.getMenu();
+        rebuildingNav = true;
+        menu.clear();
+        visibleTabs.clear();
+        visibleTabs.addAll(tabs);
+        for (int i = 0; i < tabs.size(); i++) {
+            final NavTab tab = tabs.get(i);
+            menu.add(Menu.NONE, tab.itemId, i, tab.titleRes).setIcon(tab.iconRes);
+        }
+
+        pagerAdapter.notifyDataSetChanged();   // adapter reads visibleTabs
+
+        NavTab keep = NavTab.fromItemId(selectedId);
+        NavTab target = (keep != null && visibleTabs.contains(keep)) ? keep : visibleTabs.get(0);
+        nav.setSelectedItemId(target.itemId);
+        viewPager.setCurrentItem(visibleTabs.indexOf(target), false);
+        rebuildingNav = false;
+        return true;
+    }
+
+    private void updateBottomNavigationVisibility() {
+        bottomNavigationEnabled = visibleTabs.size() > 1 && GBApplication.getPrefs().getBoolean("display_bottom_navigation_bar", true);
+        LOG.debug("Bottom navigation: tabs={}, enabled={}, pageBottomBarShown={}", visibleTabs, bottomNavigationEnabled, pageBottomBarShown);
+        navigationView.setVisibility(bottomNavigationEnabled && !pageBottomBarShown ? View.VISIBLE : View.GONE);
+        barShades.setBottomShade(bottomNavigationEnabled || pageBottomBarShown ? findViewById(R.id.bottom_nav_shade) : null);
+        ViewCompat.requestApplyInsets(mainContent);
+    }
+
+    private void selectDefaultTab() {
+        String key = GBApplication.getPrefs().getString("default_main_screen", "dashboard");
+        selectTab(NavTab.fromKey(key));
+    }
+
+    private void selectTab(final NavTab tab) {
+        int index = visibleTabs.indexOf(tab);
+        if (index < 0) return;
+
+        viewPager.setCurrentItem(index, false);
+        ((BottomNavigationView) findViewById(R.id.bottom_nav_bar)).setSelectedItemId(tab.itemId);
     }
 
     @Override
@@ -176,15 +315,6 @@ public class ControlCenterv2 extends AppCompatActivity
 
         GBPrefs prefs = GBApplication.getPrefs();
 
-        // Determine availability of device with activity tracking functionality
-        boolean activityTrackerAvailable = false;
-        List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
-        for (GBDevice dev : devices) {
-            if (dev.getDeviceCoordinator().supportsActivityTracking(dev)) {
-                activityTrackerAvailable = true;
-                break;
-            }
-        }
         if (savedInstanceState != null) {
             if (savedInstanceState.getBoolean("cl")) {
                 GBChangeLog cl = GBChangeLog.createChangeLog(this);
@@ -210,29 +340,30 @@ public class ControlCenterv2 extends AppCompatActivity
         final int headerPaddingRight = navigationHeaderView.getPaddingRight();
         final int headerPaddingBottom = navigationHeaderView.getPaddingBottom();
 
+        // Configure ViewPager2 with fragment adapter and default fragment
+        viewPager = findViewById(R.id.dashboard_viewpager);
+        pagerAdapter = new MainFragmentsPagerAdapter(this);
+        viewPager.setAdapter(pagerAdapter);
+
         // Initialize bottom navigation
-        BottomNavigationView navigationView = findViewById(R.id.bottom_nav_bar);
-        if (activityTrackerAvailable && prefs.getBoolean("display_bottom_navigation_bar", true)) {
-            navigationView.setVisibility(View.VISIBLE);
-        } else {
-            navigationView.setVisibility(View.GONE);
-        }
+        rebuildBottomNav();
+        navigationView = findViewById(R.id.bottom_nav_bar);
         navigationView.setOnItemSelectedListener(menuItem -> {
-            final int itemId = menuItem.getItemId();
-            if (itemId == R.id.bottom_nav_dashboard) {
-                viewPager.setCurrentItem(0, true);
-            } else if (itemId == R.id.bottom_nav_devices) {
-                viewPager.setCurrentItem(1, true);
+            NavTab tab = NavTab.fromItemId(menuItem.getItemId());
+            int index = visibleTabs.indexOf(tab);
+            if (index >= 0 && !rebuildingNav) {
+                viewPager.setCurrentItem(index, AndroidUtils.areAnimationsEnabled(this));
             }
             return true;
         });
+        prefs.getPreferences().registerOnSharedPreferenceChangeListener(prefListener);
 
         // Initialize actionbar
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         // targetSdk 35 forces edge-to-edge. We intercept the insets on the ConstraintLayout
         // itself (main_content) and apply them directly to the toolbar. The drawer header is
         // padded here too.
-        final View mainContent = findViewById(R.id.main_content);
+        mainContent = findViewById(R.id.main_content);
         final int toolbarPaddingLeft = toolbar.getPaddingLeft();
         final int toolbarPaddingRight = toolbar.getPaddingRight();
         final int toolbarPaddingBottom = toolbar.getPaddingBottom();
@@ -245,7 +376,8 @@ public class ControlCenterv2 extends AppCompatActivity
             toolbar.setPadding(toolbarPaddingLeft, insets.top, toolbarPaddingRight, toolbarPaddingBottom);
             navigationView.setPadding(bottomNavPaddingLeft, bottomNavPaddingTop, bottomNavPaddingRight, insets.bottom);
             // #6894 - when the bottom nav is not visible, the FAB would show up behind the system navbar
-            final int contentPaddingBottom = navigationView.getVisibility() == View.VISIBLE ? 0 : insets.bottom;
+            // A bottom bar of the page applies the system navbar inset itself
+            final int contentPaddingBottom = navigationView.getVisibility() == View.VISIBLE || pageBottomBarShown ? 0 : insets.bottom;
             swipeLayout.setPadding(swipeLayout.getPaddingLeft(), swipeLayout.getPaddingTop(), swipeLayout.getPaddingRight(), contentPaddingBottom);
             navigationHeaderView.setPadding(headerPaddingLeft, insets.top, headerPaddingRight, headerPaddingBottom);
             return windowInsets;
@@ -256,6 +388,15 @@ public class ControlCenterv2 extends AppCompatActivity
                 this, drawer, toolbar, R.string.controlcenter_navigation_drawer_open, R.string.controlcenter_navigation_drawer_close);
         drawer.setDrawerListener(toggle);
         toggle.syncState();
+        toolbar.setNavigationOnClickListener(v -> {
+            // The drawer ignores the system's animator duration scale
+            final boolean animate = AndroidUtils.areAnimationsEnabled(this);
+            if (drawer.isDrawerOpen(GravityCompat.START)) {
+                drawer.closeDrawer(GravityCompat.START, animate);
+            } else {
+                drawer.openDrawer(GravityCompat.START, animate);
+            }
+        });
         // Every theme defines its own toolbar_bg
         // Not TypedValue.data: the Dynamic surface colors are color state list resources (lStar),
         // for which data is not a color. MaterialColors resolves those too.
@@ -264,19 +405,9 @@ public class ControlCenterv2 extends AppCompatActivity
         navigationView.setBackgroundColor(MaterialColors.getColor(navigationView, R.attr.main_bar_bg));
         toolbarShade = findViewById(R.id.toolbar_shade);
         barShades = new BarShade.ScrollListener(findViewById(R.id.main_content));
-        if (navigationView.getVisibility() == View.VISIBLE) {
-            barShades.setBottomShade(findViewById(R.id.bottom_nav_shade));
-        }
+        updateBottomNavigationVisibility();
 
-        // Configure ViewPager2 with fragment adapter and default fragment
-        viewPager = findViewById(R.id.dashboard_viewpager);
-        pagerAdapter = new MainFragmentsPagerAdapter(this);
-        viewPager.setAdapter(pagerAdapter);
-        if (!prefs.getBoolean("dashboard_as_default_view", true) || !activityTrackerAvailable) {
-            viewPager.setCurrentItem(1, false);
-            navigationView.getMenu().getItem(1).setChecked(true);
-        }
-        // A page's fragment, and its view, are created after the page is selected
+        // A page's fragment, and its view, are created after onCreate
         getSupportFragmentManager().registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
             @Override
             public void onFragmentViewCreated(@NonNull final FragmentManager fm, @NonNull final Fragment fragment,
@@ -296,23 +427,35 @@ public class ControlCenterv2 extends AppCompatActivity
 
         // Sync ViewPager changes with BottomNavigationView
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            private MenuProvider existingMenuProvider = null;
-
             @Override
             public void onPageSelected(int position) {
-                navigationView.getMenu().getItem(position).setChecked(true);
-                bindTopShade();
-
-                // Ensure the menu provider is set to the current fragment
-                if (existingMenuProvider != null) {
-                    ControlCenterv2.this.removeMenuProvider(existingMenuProvider);
+                if (rebuildingNav || position >= visibleTabs.size()) return;
+                int id = visibleTabs.get(position).itemId;
+                if (navigationView.getSelectedItemId() != id) {
+                    navigationView.setSelectedItemId(id);
                 }
-                final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + position);
-                if (fragment instanceof MenuProvider) {
-                    existingMenuProvider = (MenuProvider) fragment;
-                    ControlCenterv2.this.addMenuProvider(existingMenuProvider);
+
+                bindTopShade();
+            }
+
+            @Override
+            public void onPageScrollStateChanged(final int state) {
+                if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                    requestLostLayouts(viewPager.getChildAt(0));
                 }
             }
+        });
+        if (savedInstanceState == null) {
+            selectDefaultTab();
+        }
+
+        // Create the pages next to the current page when the main thread is idle,
+        // after the current page is drawn.
+        Looper.myQueue().addIdleHandler(() -> {
+            if (!isDestroyed()) {
+                viewPager.setOffscreenPageLimit(1);
+            }
+            return false;
         });
 
         // Make sure the SwipeRefreshLayout doesn't interfere with the ViewPager2
@@ -361,24 +504,19 @@ public class ControlCenterv2 extends AppCompatActivity
         filterLocal.addAction(GBApplication.ACTION_QUIT);
         filterLocal.addAction(DeviceService.ACTION_REALTIME_SAMPLES);
         filterLocal.addAction(GBDevice.ACTION_DEVICE_CHANGED);
+        filterLocal.addAction(DeviceManager.ACTION_DEVICES_CHANGED);
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, filterLocal);
 
-        // Open the Welcome flow on first run, only check permissions on next runs
+        // Open the Welcome flow on first run
         boolean firstRun = prefs.getBoolean("first_run", true);
         if (firstRun) {
             launchWelcomeActivity();
-        } else {
-            pesterWithPermissions = prefs.getBoolean("permission_pestering", true);
-            if (pesterWithPermissions && !PermissionsUtils.checkAllPermissions(this)) {
-                Intent permissionsIntent = new Intent(this, PermissionsActivity.class);
-                permissionsIntent.putExtra(PermissionsActivity.ARG_SHOW_DO_NOT_ASK_BUTTON, true);
-                startActivity(permissionsIntent);
-            }
         }
 
-        GBChangeLog cl = GBChangeLog.createChangeLog(this);
-        boolean showChangelog = prefs.getBoolean("show_changelog", true);
-        if (showChangelog && cl.isFirstRun() && cl.hasChanges(cl.isFirstRunEver())) {
+        final GBChangeLog cl = GBChangeLog.createChangeLog(this);
+        if (cl.isFirstRunEver()) {
+            cl.skipLogDialog();
+        } else if (prefs.getBoolean("show_changelog", true) && cl.isFirstRun() && cl.hasChanges(false)) {
             try {
                 cl.getMaterialLogDialog().show();
             } catch (Exception ex) {
@@ -390,14 +528,51 @@ public class ControlCenterv2 extends AppCompatActivity
     }
 
     /**
+     * Requests the layout again for each view that waits for a layout, but whose parent does not.
+     */
+    private static void requestLostLayouts(final View view) {
+        if (view.getVisibility() == View.GONE) {
+            return;
+        }
+        // The pager detaches and attaches a page again while it scrolls. After that, a view can
+        // wait for a layout that its parents do not request, so it does not get one.
+        if (view.isLayoutRequested() && view.getParent() instanceof View && !((View) view.getParent()).isLayoutRequested()) {
+            view.requestLayout();
+        }
+        if (view instanceof ViewGroup) {
+            final ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                requestLostLayouts(group.getChildAt(i));
+            }
+        }
+    }
+
+    /**
      * Uses the shade of the visible page, if it has one of its own, instead of the shade below
      * the toolbar.
      */
     private void bindTopShade() {
-        final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + viewPager.getCurrentItem());
+        final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + pagerAdapter.getItemId(viewPager.getCurrentItem()));
         final View headerShade = fragment instanceof HeaderShadePage
                 ? ((HeaderShadePage) fragment).getHeaderShade() : null;
         barShades.setTopShade(headerShade != null ? headerShade : toolbarShade);
+    }
+
+    /**
+     * Shows or hides the bottom bar of the current page. The bottom navigation is hidden while the bar shows.
+     */
+    public void setPageBottomBarShown(final boolean shown) {
+        if (shown == pageBottomBarShown) {
+            return;
+        }
+        pageBottomBarShown = shown;
+        updateBottomNavigationVisibility();
+    }
+
+    @Override
+    public void onDashboardEditingChanged(final boolean editing) {
+        setPageBottomBarShown(editing);
+        viewPager.setUserInputEnabled(!editing);
     }
 
     @Override
@@ -412,6 +587,10 @@ public class ControlCenterv2 extends AppCompatActivity
     protected void onResume() {
         super.onResume();
         handleShortcut(getIntent());
+        if (new DashboardPreferences().hasStartEditingRequest()) {
+            // onResume only runs for the current page, DashboardFragment consumes this
+            selectTab(NavTab.DASHBOARD);
+        }
         if (isLanguageInvalid || isThemeInvalid) {
             isLanguageInvalid = false;
             isThemeInvalid = false;
@@ -422,13 +601,14 @@ public class ControlCenterv2 extends AppCompatActivity
     @Override
     protected void onDestroy() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mReceiver);
+        GBApplication.getPrefs().getPreferences().unregisterOnSharedPreferenceChangeListener(prefListener);
         super.onDestroy();
     }
 
     @Override
     public boolean onNavigationItemSelected(@NonNull final MenuItem item) {
         final DrawerLayout drawer = findViewById(R.id.drawer_layout);
-        drawer.closeDrawer(GravityCompat.START);
+        drawer.closeDrawer(GravityCompat.START, AndroidUtils.areAnimationsEnabled(this));
 
         final int itemId = item.getItemId();
         if (itemId == R.id.action_settings) {
@@ -510,18 +690,32 @@ public class ControlCenterv2 extends AppCompatActivity
             super(fa);
         }
 
+        @NonNull
         @Override
         public Fragment createFragment(int position) {
-            if (position == 0) {
-                return new DashboardFragment();
-            } else {
-                return new DevicesFragment();
-            }
+            return switch (visibleTabs.get(position)) {
+                case DASHBOARD -> new DashboardFragment();
+                case WORKOUTS -> new WorkoutListFragment();
+                default -> new DevicesFragment();
+            };
         }
 
         @Override
         public int getItemCount() {
-            return 2;
+            return visibleTabs.size();
+        }
+
+        // Stable IDs so ViewPager2 doesn't reuse the wrong fragment after a reorder
+        @Override
+        public long getItemId(int position) {
+            return visibleTabs.get(position).ordinal();
+        }
+        @Override
+        public boolean containsItem(long itemId) {
+            for (NavTab tab : visibleTabs) {
+                if (tab.ordinal() == itemId) return true;
+            }
+            return false;
         }
     }
 }

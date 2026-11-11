@@ -14,8 +14,8 @@ abstract class AbstractDjiCameraCoordinator : AbstractBLEDeviceCoordinator() {
         return "DJI"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return DjiBleSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return DjiBleSupport()
     }
 
     override fun suggestUnbindBeforePair(): Boolean {
@@ -34,7 +34,13 @@ abstract class AbstractDjiCameraCoordinator : AbstractBLEDeviceCoordinator() {
         return DeviceCoordinator.DeviceKind.CAMERA
     }
 
+    override fun supportsGallery(device: GBDevice): Boolean {
+        return true
+    }
+
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
 
     }
+
+    override fun supportsInternetAccess(device: GBDevice): Boolean = true
 }

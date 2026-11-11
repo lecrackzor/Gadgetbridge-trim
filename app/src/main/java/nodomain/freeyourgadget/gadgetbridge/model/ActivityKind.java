@@ -446,6 +446,22 @@ public enum ActivityKind {
         }
     }
 
+    /**
+     * Whether the wearer's altitude follows the ground: false on and under water, in the air,
+     * and on stairs or in buildings, where an elevation model says nothing about the activity.
+     */
+    public static boolean followsTerrain(final ActivityKind activityKind) {
+        if (isDiving(activityKind) || isSwimActivity(activityKind) || isNauticalActivity(activityKind) || isRowingActivity(activityKind)) {
+            return false;
+        }
+        return switch (activityKind) {
+            case SURFING, KITESURFING, WAKESURFING, STAND_UP_PADDLEBOARDING, DRAGON_BOAT, SNORKELING,
+                 FLYING, HANG_GLIDING, PARAGLIDING, SKY_DIVING, KITE_FLYING,
+                 FLOOR_CLIMBING, STAIRS, STAIR_STEPPER, STAIR_CLIMBER -> false;
+            default -> true;
+        };
+    }
+
     public static boolean isDiving(final ActivityKind activityKind) {
         return activityKind.name().contains("DIVING") || activityKind.name().contains("APNEA");
     }

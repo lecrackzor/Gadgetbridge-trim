@@ -22,6 +22,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -38,6 +39,8 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Objects;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -49,17 +52,21 @@ import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.devices.ColmiHeartRateSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.YawellRingLiveActivityContext;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.YawellRingConstants;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.YawellRingPacketHandler;
 import nodomain.freeyourgadget.gadgetbridge.entities.ColmiHeartRateSample;
+import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksController;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
@@ -82,6 +89,18 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int daysAgo;
     private int packetsTotalNr;
     private Calendar syncingDay;
+
+    private static int currentButtonActionId = 0;
+    private static int currentButtonPressCount = 0;
+    private static long currentButtonPressTime = 0;
+    private static long currentButtonTimerActivationTime = 0;
+    private Timer buttonActionTimer = null;
+
+    // The ring sometimes never answers a history request. Without a timeout the device stays
+    // busy forever, and ServiceDeviceSupport then drops every call and notification.
+    private static final int SYNC_TIMEOUT = 30000;
+    private final Runnable syncTimeoutRunnable = this::onSyncTimeout;
+    private boolean syncInProgress = false;
 
     private int bigDataPacketSize;
     private ByteBuffer bigDataPacket;
@@ -168,6 +187,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
         // Delay initialization with 2 seconds to give the ring time to settle
         backgroundTasksHandler.removeCallbacksAndMessages(null);
+        syncInProgress = false;
         backgroundTasksHandler.postDelayed(this::postConnectInitialization, 2000);
 
         return builder;
@@ -198,6 +218,10 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
             switch (value[0]) {
                 case YawellRingConstants.CMD_SET_DATE_TIME:
                     LOG.info("Received set date/time response: {}", StringUtils.bytesToHex(value));
+                    break;
+                case YawellRingConstants.CMD_BUTTON:
+                    LOG.info("Received button packet: {}", StringUtils.bytesToHex(value));
+                    handleButtonEvent();
                     break;
                 case YawellRingConstants.CMD_BATTERY:
                     int levelResponse = value[1];
@@ -283,7 +307,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                             getDevice().sendDeviceUpdateIntent(getContext());
                         }
                     }
-                    if (!getDevice().isBusy()) {
+                    if (syncInProgress && !getDevice().isBusy()) {
                         if (daysAgo < 7) {
                             daysAgo++;
                             fetchHistoryHR();
@@ -317,13 +341,13 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     break;
                 case YawellRingConstants.CMD_SYNC_STRESS:
                     YawellRingPacketHandler.historicalStress(getDevice(), getContext(), value);
-                    if (!getDevice().isBusy()) {
+                    if (syncInProgress && !getDevice().isBusy()) {
                         fetchHistorySpo2();
                     }
                     break;
                 case YawellRingConstants.CMD_SYNC_ACTIVITY:
                     YawellRingPacketHandler.historicalActivity(getDevice(), getContext(), value);
-                    if (!getDevice().isBusy()) {
+                    if (syncInProgress && !getDevice().isBusy()) {
                         if (daysAgo < 7) {
                             daysAgo++;
                             fetchHistoryActivity();
@@ -440,16 +464,21 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         case YawellRingConstants.BIG_DATA_TYPE_SLEEP:
                             YawellRingPacketHandler.historicalSleep(getDevice(), getContext(), value);
 
-                            daysAgo = 0;
-                            fetchHistoryHRV();
+                            if (syncInProgress) {
+                                // Signal history sync finished at this point, since older firmwares
+                                // will not send anything back after requesting HRV history.
+                                // Do it before the HRV request, so that request keeps its timeout.
+                                fetchRecordedDataFinished();
 
-                            // Signal history sync finished at this point, since older firmwares
-                            // will not send anything back after requesting HRV history
-                            fetchRecordedDataFinished();
+                                daysAgo = 0;
+                                fetchHistoryHRV();
+                            }
                             break;
                         case YawellRingConstants.BIG_DATA_TYPE_SPO2:
                             YawellRingPacketHandler.historicalSpo2(getDevice(), getContext(), value);
-                            fetchHistorySleep();
+                            if (syncInProgress) {
+                                fetchHistorySleep();
+                            }
                             break;
                         case YawellRingConstants.BIG_DATA_TYPE_ALARM:
                             YawellRingPacketHandler.alarmsSettings(getDevice(), getContext(), value);
@@ -716,6 +745,198 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     @Override
+    public void onNotification(NotificationSpec notificationSpec) {
+        if (!getCoordinator().supportsAppNotifications(getDevice())) return;
+
+        String from = notificationSpec.getSender() != null ? notificationSpec.getSender() : notificationSpec.getTitle();
+        String text = StringUtils.join(":", from, notificationSpec.getBody()).toString();
+        // The firmware only buzzes once per message, so repeat it to make it noticeable
+        int count = getDevicePrefs().getInt(YawellRingConstants.PREF_NOTIFICATION_VIBRATION_COUNT, 3);
+
+        // The device has no screen, so each repeat is just another buzz. Send them as separate
+        // transactions instead of sleeping in one, so that other BLE traffic is not blocked.
+        for (int i = 0; i < count; i++) {
+            backgroundTasksHandler.postDelayed(() -> {
+                sendPushMessage(YawellRingConstants.PUSH_TYPE_SMS, "pushNotification", text);
+            }, i * 1000L);
+        }
+    }
+
+    @Override
+    public void onSetCallState(CallSpec callSpec) {
+        if (!getCoordinator().supportsPhoneCalls(getDevice())) return;
+
+        byte type;
+        switch (callSpec.getCommand()) {
+            case CallSpec.CALL_INCOMING:
+                type = YawellRingConstants.PUSH_TYPE_CALL_INCOMING;
+                break;
+            case CallSpec.CALL_ACCEPT:
+            case CallSpec.CALL_REJECT:
+            case CallSpec.CALL_START:
+            case CallSpec.CALL_END:
+                type = YawellRingConstants.PUSH_TYPE_CALL_STOP;
+                break;
+            default:
+                return;
+        }
+
+        String caller = callSpec.getName() != null ? callSpec.getName() : callSpec.getNumber();
+        sendPushMessage(type, "pushCallState", caller);
+    }
+
+    private void handleButtonEvent() {
+
+        // If disabled we return from function immediately
+        Prefs prefs = new Prefs(GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress()));
+        if (!prefs.getBoolean(YawellRingConstants.PREF_BUTTON_ACTION_ENABLE, false)) {
+            return;
+        }
+
+        int buttonPressMaxDelay = prefs.getInt(YawellRingConstants.PREF_BUTTON_ACTION_PRESS_MAX_INTERVAL, 2000);
+        int requiredButtonPressCount = prefs.getInt(YawellRingConstants.PREF_BUTTON_ACTION_PRESS_COUNT, 0);
+
+        if (requiredButtonPressCount > 0) {
+            long timeSinceLastPress = System.currentTimeMillis() - currentButtonPressTime;
+
+            if ((currentButtonPressTime == 0) || (timeSinceLastPress < buttonPressMaxDelay)) {
+                currentButtonPressCount++;
+            } else {
+                currentButtonPressCount = 1;
+                currentButtonActionId = 0;
+            }
+            if (buttonActionTimer != null){
+                buttonActionTimer.cancel();
+            }
+
+            currentButtonPressTime = System.currentTimeMillis();
+            if (currentButtonPressCount == requiredButtonPressCount) {
+                currentButtonTimerActivationTime = currentButtonPressTime;
+                LOG.info("Activating button timer");
+                buttonActionTimer = new Timer("Button Action Timer");
+                buttonActionTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        processButtonAction();
+                        buttonActionTimer.cancel();
+                    }
+                }, buttonPressMaxDelay, buttonPressMaxDelay);
+
+                currentButtonActionId++;
+                currentButtonPressCount = 0;
+            }
+        }
+    }
+
+    private void processButtonAction() {
+        if (currentButtonTimerActivationTime != currentButtonPressTime) {
+            return;
+        }
+        //handle user events settings. 0 is long press, rest are button_id 1-3
+        switch (currentButtonActionId) {
+            case 0:
+                executeButtonAction("button_long_press_action_selection");
+                break;
+            case 1:
+                executeButtonAction("button_single_press_action_selection");
+                break;
+            case 2:
+                executeButtonAction("button_double_press_action_selection");
+                break;
+            case 3:
+                executeButtonAction("button_triple_press_action_selection");
+                break;
+            default:
+                break;
+        }
+
+        currentButtonActionId = 0;
+        currentButtonPressCount = 0;
+        currentButtonPressTime = System.currentTimeMillis();
+    }
+
+    private void executeButtonAction(String buttonKey) {
+        String buttonPreference = getDevicePrefs().getString(buttonKey, YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_OFF);
+
+        if (buttonPreference.equals(YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_OFF)) {
+            return;
+        }
+        if (getDevicePrefs().getBoolean(YawellRingConstants.PREF_BUTTON_ACTION_VIBRATE, false)) {
+            vibrateOnce();
+        }
+        switch (buttonPreference) {
+            case YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_BROADCAST:
+                sendSystemBroadcastWithButtonId();
+                break;
+            case YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_FITNESS_APP_START:
+                OpenTracksController.startRecording(this.getContext());
+                break;
+            case YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_FITNESS_APP_STOP:
+                OpenTracksController.stopRecording(this.getContext());
+                break;
+            case YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_FITNESS_APP_TOGGLE:
+                OpenTracksController.toggleRecording(this.getContext());
+                break;
+            default:
+                handleMediaButton(buttonPreference);
+        }
+    }
+
+    private void vibrateOnce() {
+        sendPushMessage(YawellRingConstants.PUSH_TYPE_SMS, "vibrateOne", "Vibrate");
+    }
+
+    private void sendPushMessage(byte type, String taskName, String text) {
+        BluetoothGattCharacteristic characteristic = getCharacteristic(YawellRingConstants.CHARACTERISTIC_WRITE);
+        if (characteristic == null) return;
+        TransactionBuilder builder = createTransactionBuilder(taskName);
+        writePushMessage(builder, characteristic, type, text);
+        builder.queue();
+    }
+
+    private void sendSystemBroadcastWithButtonId() {
+        Prefs prefs = new Prefs(GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress()));
+        String requiredButtonPressMessage = prefs.getString(YawellRingConstants.PREF_BUTTON_ACTION_BROADCAST,
+                this.getContext().getString(R.string.mi2_prefs_button_press_broadcast_default_value));
+        Intent in = new Intent();
+        in.setAction(requiredButtonPressMessage);
+        in.putExtra("button_id", currentButtonActionId);
+        LOG.info("Sending " + requiredButtonPressMessage + " with button_id " + currentButtonActionId);
+        this.getContext().getApplicationContext().sendBroadcast(in);
+    }
+
+    private void handleMediaButton(String mediaAction) {
+        if (mediaAction.equals(YawellRingConstants.PREF_BUTTON_ACTION_SELECTION_OFF)) {
+            return;
+        }
+        GBDeviceEventMusicControl deviceEventMusicControl = new GBDeviceEventMusicControl();
+        deviceEventMusicControl.event = GBDeviceEventMusicControl.Event.valueOf(mediaAction);
+        evaluateGBDeviceEvent(deviceEventMusicControl);
+    }
+
+    /**
+     * A push message is split into chunks of 11 bytes of UTF-8 text, each sent as
+     * {CMD_PUSH_MESSAGE, type, total chunks, chunk index (1-based), text...}.
+     */
+    private void writePushMessage(TransactionBuilder builder, BluetoothGattCharacteristic characteristic, byte type, String text) {
+        byte[] textBytes = StringUtils.truncateToBytes(text, YawellRingConstants.PUSH_CHUNK_SIZE * YawellRingConstants.PUSH_MAX_CHUNKS);
+        int chunks = Math.max(1, (textBytes.length + YawellRingConstants.PUSH_CHUNK_SIZE - 1) / YawellRingConstants.PUSH_CHUNK_SIZE);
+        for (int i = 0; i < chunks; i++) {
+            int start = i * YawellRingConstants.PUSH_CHUNK_SIZE;
+            int length = Math.min(YawellRingConstants.PUSH_CHUNK_SIZE, textBytes.length - start);
+            ByteBuffer contents = ByteBuffer.allocate(4 + length);
+            contents.put(YawellRingConstants.CMD_PUSH_MESSAGE);
+            contents.put(type);
+            contents.put((byte) chunks);
+            contents.put((byte) (i + 1));
+            contents.put(textBytes, start, length);
+            byte[] packet = buildPacket(contents.array());
+            LOG.debug("Push message chunk sent: {}", StringUtils.bytesToHex(packet));
+            builder.write(characteristic, packet);
+        }
+    }
+
+    @Override
     public void onHeartRateTest() {
         byte[] measureHeartRatePacket = buildPacket(new byte[]{YawellRingConstants.CMD_MANUAL_HEART_RATE, 0x01});
         LOG.info("Measure HR request sent: {}", StringUtils.bytesToHex(measureHeartRatePacket));
@@ -760,17 +981,41 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onFetchRecordedData(int dataTypes) {
+        if (syncInProgress) {
+            LOG.info("Sync already in progress, ignoring fetch request");
+            return;
+        }
+        syncInProgress = true;
         GB.updateTransferNotification(getContext().getString(R.string.busy_task_fetch_activity_data), "", true, 0, getContext());
         daysAgo = 0;
         fetchHistoryActivity();
     }
 
     private void fetchRecordedDataFinished() {
+        syncInProgress = false;
+        backgroundTasksHandler.removeCallbacks(syncTimeoutRunnable);
         GB.updateTransferNotification(null, "", false, 100, getContext());
         LOG.info("Sync finished!");
         getDevice().unsetBusyTask();
         getDevice().sendDeviceUpdateIntent(getContext());
         GB.signalActivityDataFinish(getDevice());
+    }
+
+    /**
+     * Restarts the sync timeout. Called with every history request, so it only fires when the
+     * ring stops answering in the middle of a sync.
+     */
+    private void armSyncTimeout() {
+        backgroundTasksHandler.removeCallbacks(syncTimeoutRunnable);
+        backgroundTasksHandler.postDelayed(syncTimeoutRunnable, SYNC_TIMEOUT);
+    }
+
+    private void onSyncTimeout() {
+        if (!syncInProgress && !getDevice().isBusy()) {
+            return;
+        }
+        LOG.warn("No answer from the ring during sync (busy with {}), aborting it", getDevice().getBusyTask());
+        fetchRecordedDataFinished();
     }
 
     private void fetchHistoryActivity() {
@@ -784,6 +1029,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         syncingDay.set(Calendar.MILLISECOND, 0);
         byte[] activityHistoryRequest = buildPacket(new byte[]{YawellRingConstants.CMD_SYNC_ACTIVITY, (byte) daysAgo, 0x0f, 0x00, 0x5f, 0x01});
         LOG.info("Fetch historical activity data request sent: {}", StringUtils.bytesToHex(activityHistoryRequest));
+        armSyncTimeout();
         sendWrite("activityHistoryRequest", activityHistoryRequest);
     }
 
@@ -805,6 +1051,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         hrHistoryRequestBB.putInt(1, (int) (requestTimestamp / 1000));
         byte[] hrHistoryRequest = buildPacket(hrHistoryRequestBB.array());
         LOG.info("Fetch historical HR data request sent ({}): {}", DateTimeUtils.formatIso8601(syncingDay.getTime()), StringUtils.bytesToHex(hrHistoryRequest));
+        armSyncTimeout();
         sendWrite("hrHistoryRequest", hrHistoryRequest);
     }
 
@@ -814,6 +1061,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         syncingDay = Calendar.getInstance();
         byte[] stressHistoryRequest = buildPacket(new byte[]{YawellRingConstants.CMD_SYNC_STRESS});
         LOG.info("Fetch historical stress data request sent: {}", StringUtils.bytesToHex(stressHistoryRequest));
+        armSyncTimeout();
         sendWrite("stressHistoryRequest", stressHistoryRequest);
     }
 
@@ -830,6 +1078,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 (byte) 0xff
         };
         LOG.info("Fetch historical SpO2 data request sent: {}", StringUtils.bytesToHex(spo2HistoryRequest));
+        armSyncTimeout();
         sendCommand("spo2HistoryRequest", spo2HistoryRequest);
     }
 
@@ -846,6 +1095,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 (byte) 0xff
         };
         LOG.info("Fetch historical sleep data request sent: {}", StringUtils.bytesToHex(sleepHistoryRequest));
+        armSyncTimeout();
         sendCommand("sleepHistoryRequest", sleepHistoryRequest);
     }
 
@@ -865,6 +1115,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         hrvHistoryRequestBB.putInt(1, daysAgo);
         byte[] hrvHistoryRequest = buildPacket(hrvHistoryRequestBB.array());
         LOG.info("Fetch historical HRV data request sent ({}): {}", formatIso8601(syncingDay), StringUtils.bytesToHex(hrvHistoryRequest));
+        armSyncTimeout();
         sendWrite("hrvHistoryRequest", hrvHistoryRequest);
     }
 
@@ -893,6 +1144,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 0x02
         };
         LOG.info("Fetch historical temperature data request sent: {}", StringUtils.bytesToHex(temperatureHistoryRequest));
+        armSyncTimeout();
         sendCommand("temperatureHistoryRequest", temperatureHistoryRequest);
     }
 }

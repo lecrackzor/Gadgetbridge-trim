@@ -69,7 +69,14 @@ class InternetHelperBinding<T> private constructor(
                 throw InternetHelperException(InternetUtils.noInternetAccessReason(context))
             }
 
-            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS) || service == null) {
+            val connected = try {
+                latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+            } catch (e: InterruptedException) {
+                LOG.debug("Interrupted while binding to {}", action)
+                context.unbindService(connection)
+                throw e
+            }
+            if (!connected || service == null) {
                 LOG.error("Timeout after {} ms while binding to {}", timeoutMs, action)
                 context.unbindService(connection)
                 throw InternetHelperException(InternetUtils.noInternetAccessReason(context))

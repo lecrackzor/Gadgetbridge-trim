@@ -830,7 +830,7 @@ public class MiBandSupport extends AbstractBTLESingleDeviceSupport {
         if (MiBandService.UUID_CHARACTERISTIC_DEVICE_INFO.equals(characteristicUUID)) {
             handleDeviceInfo(value, status);
             return true;
-        } else if (GattCharacteristic.CHARACTERISTIC_DEVICE_NAME.equals(characteristicUUID)) {
+        } else if (GattCharacteristic.CHARACTERISTIC_DEVICE_NAME.uuid.equals(characteristicUUID)) {
             handleDeviceName(value, status);
             return true;
         } else if (MiBandService.UUID_CHARACTERISTIC_BATTERY.equals(characteristicUUID)) {

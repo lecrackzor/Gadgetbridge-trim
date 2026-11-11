@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.externalservices
 
 import android.content.Context
+import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceFragmentCompat
@@ -43,7 +44,8 @@ enum class AuthStyle(
  * called, how it is set up and how to tell whether it is ready to be used.
  *
  * Implementations are stateless singletons registered once in [ExternalServiceRegistry]; anything
- * they need to remember lives in the preferences their [id] namespaces.
+ * they need to remember lives in the preferences [id] namespaces, or in an
+ * [ExternalServiceTokenStore].
  */
 interface ExternalService {
     /**
@@ -79,8 +81,15 @@ interface ExternalService {
      */
     fun isLoggedIn(context: Context): Boolean
 
-    /** One line saying where the user stands with this service, for its settings rows. */
-    fun statusSummary(context: Context): CharSequence
+    /**
+     * One line saying where the user stands with this service, for its settings rows. Names the
+     * instance for a self-hosted service, since the user may have more than one in mind.
+     */
+    fun statusSummary(context: Context): CharSequence = when {
+        !isLoggedIn(context) -> context.getString(R.string.service_not_logged_in)
+        serverUrl() != null -> context.getString(R.string.service_logged_in_to, serverUrl())
+        else -> context.getString(R.string.service_logged_in)
+    }
 
     /**
      * Fetches whatever [statusSummary] shows that the service has to be asked for, calling
@@ -105,6 +114,34 @@ interface ExternalService {
      * finds it.
      */
     fun onSettingsScreenCreated(fragment: PreferenceFragmentCompat) {}
+
+    /**
+     * Arranges whatever this service needs doing on its own while the app is not in front of the
+     * user, such as refreshing a credential before it expires. Called once at startup, so an
+     * implementation schedules rather than does the work, and answers for a service that is not
+     * set up by scheduling nothing.
+     */
+    fun scheduleBackgroundWork(context: Context) {}
+
+    /**
+     * Renews the stored credentials, for a service whose login expires. Answers whether it worked;
+     * a service whose credentials do not expire has nothing to do and says so. Blocking: called
+     * from a worker.
+     */
+    fun refreshCredentials(context: Context): Boolean = true
+
+    /**
+     * Whether the stored credentials have run out and [refreshCredentials] has to go first. A
+     * service whose access token is short-lived says so here, so a call is not spent finding out
+     * with a 401. Answers false for a service whose credentials do not expire.
+     */
+    fun credentialsExpired(context: Context): Boolean = false
+
+    /**
+     * Handles the link the browser comes back on after a login, whose host is this service's [id].
+     * What the rest of it carries is the service's own business.
+     */
+    fun onLoginCallback(context: Context, uri: Uri) {}
 }
 
 /**

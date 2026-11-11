@@ -17,6 +17,15 @@ import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator63
 import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator64;
 import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator65;
 import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator66;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator67;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator68;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator69;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator70;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator71;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator72;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator73;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator74;
+import nodomain.freeyourgadget.gadgetbridge.prefs.migrators.PreferenceMigrator75;
 
 public class GBPrefsMigrator {
     private static final Logger LOG = LoggerFactory.getLogger(GBPrefsMigrator.class);
@@ -24,7 +33,7 @@ public class GBPrefsMigrator {
     public static final String PREFS_VERSION = "shared_preferences_version";
     //if preferences have to be migrated, increment the following and add the migration logic in migratePrefs below
     // see http://stackoverflow.com/questions/16397848/how-can-i-migrate-android-preferences-with-a-new-version
-    private static final int CURRENT_PREFS_VERSION = 66;
+    private static final int CURRENT_PREFS_VERSION = 75;
 
     public static void migratePrefsIfNeeded(final SharedPreferences sharedPrefs) {
         final int oldVersion = getPrefsFileVersion(sharedPrefs);
@@ -46,6 +55,15 @@ public class GBPrefsMigrator {
             if (oldVersion < 64) new PreferenceMigrator64().migrate(oldVersion, sharedPrefs, editor);
             if (oldVersion < 65) new PreferenceMigrator65().migrate(oldVersion, sharedPrefs, editor);
             if (oldVersion < 66) new PreferenceMigrator66().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 67) new PreferenceMigrator67().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 68) new PreferenceMigrator68().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 69) new PreferenceMigrator69().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 70) new PreferenceMigrator70().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 71) new PreferenceMigrator71().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 72) new PreferenceMigrator72().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 73) new PreferenceMigrator73().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 74) new PreferenceMigrator74().migrate(oldVersion, sharedPrefs, editor);
+            if (oldVersion < 75) new PreferenceMigrator75().migrate(oldVersion, sharedPrefs, editor);
 
             editor.putString(PREFS_VERSION, Integer.toString(CURRENT_PREFS_VERSION));
             editor.apply();

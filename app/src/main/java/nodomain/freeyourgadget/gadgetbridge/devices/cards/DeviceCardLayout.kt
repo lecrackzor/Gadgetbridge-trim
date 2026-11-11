@@ -7,28 +7,23 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import org.slf4j.LoggerFactory
 
 /**
- * The user order and the removed items of the device card icon row, persisted per device.
- * Items that are not in the persisted order are new, and display at their default position.
- * Optional items are displayed only when they are explicitly added by the user.
- * This avoids the need for preference migrations when devices get new items, or new capabilities.
+ * The user order and the removed entries of a device card section, persisted per device.
+ * Entries that are not in the persisted order are new, and display at their default position.
+ * Optional entries are displayed only when they are explicitly added by the user.
+ * This avoids the need for preference migrations when devices get new entries, or new capabilities.
  */
-object DeviceCardLayout {
-    private val LOG = LoggerFactory.getLogger(DeviceCardLayout::class.java)
-
-    private const val PREF_ORDER = "device_card_items_order"
-    private const val PREF_REMOVED = "device_card_items_removed"
-
-    private const val SHOW_NEVER = "never"
-    private const val SHOW_CONNECTED = "connected"
+enum class DeviceCardLayout(private val prefOrder: String, private val prefRemoved: String) {
+    ITEMS("device_card_items_order", "device_card_items_removed"),
+    QUICK_CONTROLS("device_card_quick_controls_order", "device_card_quick_controls_removed"),
+    ;
 
     /**
-     * Returns the items of [defaults] that the user did not remove, in the user order.
+     * Returns the entries of [defaults] that the user did not remove, in the user order.
      */
-    @JvmStatic
-    fun apply(device: GBDevice, defaults: List<DeviceCardItem>): List<DeviceCardItem> {
+    fun <T : DeviceCardEntry> apply(device: GBDevice, defaults: List<T>): List<T> {
         val prefs = GBApplication.getDeviceSpecificSharedPrefs(device.address)
-        val order = split(prefs.getString(PREF_ORDER, null))
-        val removed = split(prefs.getString(PREF_REMOVED, null)).toSet()
+        val order = split(prefs.getString(prefOrder, null))
+        val removed = split(prefs.getString(prefRemoved, null)).toSet()
 
         val byId = defaults.filter { it.id !in removed }.associateBy { it.id }
         val ordered = order.mapNotNull { byId[it] }.toMutableList()
@@ -47,48 +42,55 @@ object DeviceCardLayout {
     }
 
     /**
-     * Returns the items of [defaults] that the user removed.
+     * Returns the entries of [defaults] that the user removed.
      */
-    fun removed(device: GBDevice, defaults: List<DeviceCardItem>): List<DeviceCardItem> {
+    fun <T : DeviceCardEntry> removed(device: GBDevice, defaults: List<T>): List<T> {
         val prefs = GBApplication.getDeviceSpecificSharedPrefs(device.address)
-        val order = split(prefs.getString(PREF_ORDER, null)).toSet()
-        val removed = split(prefs.getString(PREF_REMOVED, null)).toSet()
+        val order = split(prefs.getString(prefOrder, null)).toSet()
+        val removed = split(prefs.getString(prefRemoved, null)).toSet()
         return defaults.filter { it.id in removed || (it.optional && it.id !in order) }
     }
 
-    fun save(device: GBDevice, ordered: List<DeviceCardItem>, removed: List<DeviceCardItem>) {
+    fun save(device: GBDevice, ordered: List<DeviceCardEntry>, removed: List<DeviceCardEntry>) {
         val order = ordered.joinToString(",") { it.id }
         val removedIds = removed.filterNot { it.optional }.joinToString(",") { it.id }
-        LOG.debug("Saving device card items for {}: order={}, removed={}", device.address, order, removedIds)
+        LOG.debug("Saving device card layout {} for {}: order={}, removed={}", name, device.address, order, removedIds)
         GBApplication.getDeviceSpecificSharedPrefs(device.address).edit {
-            putString(PREF_ORDER, order)
-            putString(PREF_REMOVED, removedIds)
+            putString(prefOrder, order)
+            putString(prefRemoved, removedIds)
         }
     }
 
     fun reset(device: GBDevice) {
-        LOG.debug("Resetting device card items for {}", device.address)
+        LOG.debug("Resetting device card layout {} for {}", name, device.address)
         GBApplication.getDeviceSpecificSharedPrefs(device.address).edit {
-            remove(PREF_ORDER)
-            remove(PREF_REMOVED)
+            remove(prefOrder)
+            remove(prefRemoved)
         }
     }
 
-    /**
-     * Whether the device card icon row is shown for the current state of the device.
-     */
-    @JvmStatic
-    fun isShown(device: GBDevice): Boolean {
-        val mode = GBApplication.getDevicePrefs(device)
-            .getString(DeviceSettingsPreferenceConst.PREF_DEVICE_CARD_SHOW_ITEMS, "always")
-        return when (mode) {
-            SHOW_NEVER -> false
-            SHOW_CONNECTED -> device.isInitialized
-            else -> true
-        }
-    }
+    companion object {
+        private val LOG = LoggerFactory.getLogger(DeviceCardLayout::class.java)
 
-    private fun split(value: String?): List<String> = value?.split(",")
-        ?.filter { it.isNotEmpty() }
-        ?: emptyList()
+        private const val SHOW_NEVER = "never"
+        private const val SHOW_CONNECTED = "connected"
+
+        /**
+         * Whether the device card icon row is shown for the current state of the device.
+         */
+        @JvmStatic
+        fun isShown(device: GBDevice): Boolean {
+            val mode = GBApplication.getDevicePrefs(device)
+                .getString(DeviceSettingsPreferenceConst.PREF_DEVICE_CARD_SHOW_ITEMS, "always")
+            return when (mode) {
+                SHOW_NEVER -> false
+                SHOW_CONNECTED -> device.isInitialized
+                else -> true
+            }
+        }
+
+        private fun split(value: String?): List<String> = value?.split(",")
+            ?.filter { it.isNotEmpty() }
+            ?: emptyList()
+    }
 }

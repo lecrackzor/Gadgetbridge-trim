@@ -4,6 +4,7 @@ import android.net.Uri;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,14 +16,21 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiHttpService;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiHttp;
 import nodomain.freeyourgadget.gadgetbridge.util.HttpUtils;
 
 public class GarminHttpRequest {
     private static final Logger LOG = LoggerFactory.getLogger(GarminHttpRequest.class);
 
-    private final GdiHttpService.HttpService.RawRequest rawRequest;
-    private final GdiHttpService.HttpService.WebRequest webRequest;
+    // Connect IQ apps set the request body's Content-Type with a Communications.REQUEST_CONTENT_TYPE_*
+    // value, which reaches us as that enum's number. Garmin Connect maps it to the MIME type.
+    private static final String CIQ_CONTENT_TYPE_URL_ENCODED = "0";
+    private static final String CIQ_CONTENT_TYPE_JSON = "1";
+    private static final String MIME_URL_ENCODED = "application/x-www-form-urlencoded";
+    private static final String MIME_JSON = "application/json";
+
+    private final GdiHttp.RawResourceRequest rawRequest;
+    private final GdiHttp.ConnectIQHTTPRequest webRequest;
 
     private final int messageRequestId;
 
@@ -30,43 +38,55 @@ public class GarminHttpRequest {
     private final Uri uri;
     private final Map<String, String> headers;
 
-    public GarminHttpRequest(final GdiHttpService.HttpService.RawRequest rawRequest,
+    public GarminHttpRequest(final GdiHttp.RawResourceRequest rawRequest,
                              final int messageRequestId) {
         this.messageRequestId = messageRequestId;
         this.rawRequest = rawRequest;
         this.webRequest = null;
         this.method = rawRequest.getMethod().name();
         this.uri = Uri.parse(rawRequest.getUrl());
-        this.headers = headersToMap(rawRequest.getHeaderList());
+        this.headers = headersToMap(rawRequest.getHeadersList());
     }
 
-    public GarminHttpRequest(final GdiHttpService.HttpService.WebRequest webRequest,
+    public GarminHttpRequest(final GdiHttp.ConnectIQHTTPRequest webRequest,
                              final int messageRequestId) throws GarminJsonException {
         this.messageRequestId = messageRequestId;
         this.rawRequest = null;
         this.webRequest = webRequest;
-        this.method = webRequest.getMethod().name();
+        this.method = webRequest.getHttpMethod().name();
         this.uri = Uri.parse(webRequest.getUrl());
         this.headers = new LinkedHashMap<>();
-        if (!webRequest.getHeaders().isEmpty()) {
-            final JsonElement garminHeaders = GarminJson.decode(webRequest.getHeaders().toByteArray());
+        if (!webRequest.getHttpHeaderFields().isEmpty()) {
+            final JsonElement garminHeaders = GarminJson.decode(webRequest.getHttpHeaderFields().toByteArray());
             if (garminHeaders instanceof JsonObject jsonObject) {
                 for (String key : jsonObject.keySet()) {
-                    headers.put(key, jsonObject.get(key).getAsString());
+                    String value = jsonObject.get(key).getAsString();
+                    if ("content-type".equalsIgnoreCase(key)) {
+                        value = mimeTypeOf(value);
+                    }
+                    headers.put(key, value);
                 }
             }
         }
+    }
+
+    private static String mimeTypeOf(final String connectIqContentType) {
+        return switch (connectIqContentType) {
+            case CIQ_CONTENT_TYPE_URL_ENCODED -> MIME_URL_ENCODED;
+            case CIQ_CONTENT_TYPE_JSON -> MIME_JSON;
+            default -> connectIqContentType;
+        };
     }
 
     public int getMessageRequestId() {
         return messageRequestId;
     }
 
-    public GdiHttpService.HttpService.RawRequest getRawRequest() {
+    public GdiHttp.RawResourceRequest getRawRequest() {
         return rawRequest;
     }
 
-    public GdiHttpService.HttpService.WebRequest getWebRequest() {
+    public GdiHttp.ConnectIQHTTPRequest getWebRequest() {
         return webRequest;
     }
 
@@ -87,7 +107,7 @@ public class GarminHttpRequest {
     }
 
     public byte[] getBody() {
-        return rawRequest != null ? rawRequest.getRawBody().toByteArray() : webRequest.getBody().toByteArray();
+        return rawRequest != null ? rawRequest.getRawBody().toByteArray() : webRequest.getHttpBody().toByteArray();
     }
 
     public byte[] getBodyToSend() {
@@ -97,10 +117,14 @@ public class GarminHttpRequest {
             }
             return rawRequest.getRawBody().toByteArray();
         } else {
-            final byte[] webRequestBodyBytes = webRequest.getBody().toByteArray();
+            final byte[] webRequestBodyBytes = webRequest.getHttpBody().toByteArray();
             if (webRequestBodyBytes != null) {
                 try {
-                    return GarminJson.decode(webRequestBodyBytes).toString().getBytes(StandardCharsets.UTF_8);
+                    final JsonElement body = GarminJson.decode(webRequestBodyBytes);
+                    if (isUrlEncoded() && body instanceof JsonObject form) {
+                        return urlEncode(form).getBytes(StandardCharsets.UTF_8);
+                    }
+                    return body.toString().getBytes(StandardCharsets.UTF_8);
                 } catch (final GarminJsonException e) {
                     LOG.error("WebRequest body is not GarminJson, will send raw bytes", e);
                     return webRequestBodyBytes;
@@ -108,6 +132,35 @@ public class GarminHttpRequest {
             }
         }
         return null;
+    }
+
+    private boolean isUrlEncoded() {
+        for (final Map.Entry<String, String> header : headers.entrySet()) {
+            if ("content-type".equalsIgnoreCase(header.getKey())) {
+                return header.getValue().startsWith(MIME_URL_ENCODED);
+            }
+        }
+        return false;
+    }
+
+    private static String urlEncode(final JsonObject form) {
+        final StringBuilder sb = new StringBuilder();
+        for (final Map.Entry<String, JsonElement> e : form.entrySet()) {
+            if (sb.length() > 0) {
+                sb.append('&');
+            }
+            final JsonElement value = e.getValue();
+            final String text = value instanceof JsonPrimitive primitive ? primitive.getAsString()
+                    : value.isJsonNull() ? "" : value.toString();
+            sb.append(formEncode(e.getKey()))
+                    .append('=')
+                    .append(formEncode(text));
+        }
+        return sb.toString();
+    }
+
+    private static String formEncode(final String text) {
+        return Uri.encode(text).replace("%20", "+");
     }
 
     public String getMethod() {
@@ -122,9 +175,9 @@ public class GarminHttpRequest {
         return headers;
     }
 
-    private static Map<String, String> headersToMap(final List<GdiHttpService.HttpService.Header> headers) {
+    private static Map<String, String> headersToMap(final List<GdiHttp.RawResourceRequest.HTTPHeader> headers) {
         final Map<String, String> ret = new HashMap<>();
-        for (final GdiHttpService.HttpService.Header header : headers) {
+        for (final GdiHttp.RawResourceRequest.HTTPHeader header : headers) {
             ret.put(header.getKey().toLowerCase(Locale.ROOT), header.getValue());
         }
         return ret;

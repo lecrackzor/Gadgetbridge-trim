@@ -43,10 +43,15 @@ public class LiveviewCoordinator extends AbstractBLClassicDeviceCoordinator {
         return true;
     }
 
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return LiveviewSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new LiveviewSupport();
     }
 
     @Override

@@ -40,6 +40,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutDeletion
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileOutputStream
@@ -204,6 +207,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                                 ?.getActivityTrack(parsedWorkout.summary)
                             val activityPoints = activityTrack?.allPoints
                             if (activityTrack != null && !activityPoints.isNullOrEmpty()) {
+                                // Altitude from imported elevation tiles replaces what the device recorded
+                                if (ElevationTiles.correct(requireContext(), gbDevice, ActivityKind.fromCode(parsedWorkout.summary.activityKind), activityPoints)) {
+                                    ElevationTiles.applyToSummary(parsedWorkout.data, activityPoints)
+                                }
                                 val intervals = IntervalChartUtils.deriveIntervals(
                                     activityTrack.segments, activityTrack.segmentInfos
                                 )
@@ -456,6 +463,38 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 true
             }
 
+            R.id.activity_action_delete -> {
+                currentWorkout?.let {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(getString(R.string.sports_activity_confirm_single_delete_title))
+                        .setMessage(getString(R.string.sports_activity_confirm_single_delete_description))
+                        .setIcon(R.drawable.ic_delete_forever)
+                        .setPositiveButton(R.string.yes) { _, _ ->
+                            val healthConnectSnapshot = HealthConnectWorkoutDeletion.snapshot(it.summary)
+                            try {
+                                it.summary.delete()
+                                healthConnectSnapshot?.let { snapshot ->
+                                    HealthConnectWorkoutDeletion.deleteWorkoutsFromHealthConnect(
+                                        requireContext(),
+                                        listOf(snapshot)
+                                    )
+                                }
+                            } catch (_: Exception) {
+                                // pass delete error
+                            }
+                            // Signal WorkoutListFragment that it needs to refresh
+                            val intent = Intent(GBApplication.ACTION_NEW_DATA)
+                            intent.putExtra(GBDevice.EXTRA_DEVICE, gbDevice)
+                            LocalBroadcastManager.getInstance(GBApplication.getContext())
+                                .sendBroadcast(intent)
+                            requireActivity().finish()
+                        }
+                        .setNegativeButton(R.string.no, null)
+                        .show()
+                }
+                true
+            }
+
             android.R.id.home -> {
                 requireActivity().finish()
                 true
@@ -694,7 +733,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     private fun viewGpxTrack() {
         val workout = currentWorkout ?: return
         val activityTrackProvider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, requireContext())
-        val gpxFile = ActivitySummaryUtils.getShareableGpxFile(activityTrackProvider, workout.summary)
+        val gpxFile = ActivitySummaryUtils.getShareableGpxFile(activityTrackProvider, gbDevice, workout.summary)
 
         if (gpxFile == null) {
             GB.toast(requireContext(),
@@ -718,7 +757,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     private fun shareGpxTrack() {
         val workout = currentWorkout ?: return
         val activityTrackProvider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, requireContext())
-        val gpxFile = ActivitySummaryUtils.getShareableGpxFile(activityTrackProvider, workout.summary)
+        val gpxFile = ActivitySummaryUtils.getShareableGpxFile(activityTrackProvider, gbDevice, workout.summary)
 
         if (gpxFile == null) {
             GB.toast(requireContext(), getString(R.string.no_gpx_track_in_activity_toast), Toast.LENGTH_LONG, GB.INFO)

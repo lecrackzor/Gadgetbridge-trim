@@ -20,7 +20,6 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.compon
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.installUnsupportedFiles
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.keepActivityDataOnDevice
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.newSyncProtocol
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.sendAppNotifications
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.timeSync
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.workoutSendGpsToBand
@@ -111,26 +110,24 @@ fun garminDeviceSettings(
     if (coordinator.supportsNavigation(device)) {
         notifications.add(R.xml.devicesettings_navigation_notifications)
     }
-    screen(
-        DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
-        icon = R.drawable.ic_notifications,
+    DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.screen(
         xmlSubScreens = notifications,
     ) {
         sendAppNotifications()
     }
 
-    screen(DeviceSpecificSettingsScreen.LOCATION, icon = R.drawable.ic_gps_location) {
+    DeviceSpecificSettingsScreen.LOCATION.screen {
         workoutSendGpsToBand()
         if (coordinator.supportsAgpsUpdates(device)) {
             garminAgps(device)
         }
     }
 
-    screen(DeviceSpecificSettingsScreen.DATE_TIME, icon = R.drawable.ic_timer) {
+    DeviceSpecificSettingsScreen.DATE_TIME.screen {
         timeSync()
     }
 
-    screen(DeviceSpecificSettingsScreen.CONNECTION, icon = R.drawable.ic_mtu) {
+    DeviceSpecificSettingsScreen.CONNECTION.screen {
         highMtu()
     }
 
@@ -144,7 +141,7 @@ fun garminDeviceSettings(
         )
     }
 
-    screen(DeviceSpecificSettingsScreen.DEVELOPER, icon = R.drawable.ic_developer_mode) {
+    DeviceSpecificSettingsScreen.DEVELOPER.screen {
         filePicker(
             key = DeviceSettingsPreferenceConst.PREF_IMPORT_ACTIVITY_FILES,
             title = R.string.pref_import_activity_files_title,

@@ -24,8 +24,8 @@ class Ls24xDeviceCoordinator : AbstractBLEDeviceCoordinator() {
         return Pattern.compile("UCS LS2")
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
-        return CardoDeviceSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return CardoDeviceSupport()
     }
 
 
@@ -173,6 +173,12 @@ class Ls24xDeviceCoordinator : AbstractBLEDeviceCoordinator() {
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind {
         return DeviceCoordinator.DeviceKind.HEAD_MOUNTED
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 
     companion object {
         private fun fmPresetEntries(device: GBDevice): List<ListEntry> {

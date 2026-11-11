@@ -40,8 +40,8 @@ import java.util.Locale
 abstract class AbstractRedmiBudsCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getManufacturer(): String = "Xiaomi"
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
-        RedmiBudsDeviceSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport =
+        RedmiBudsDeviceSupport()
 
     override fun getBondingStyle(): Int = BONDING_STYLE_NONE
 
@@ -412,4 +412,10 @@ abstract class AbstractRedmiBudsCoordinator : AbstractBLClassicDeviceCoordinator
         val fallbackValue = fallback.name.lowercase(Locale.ROOT)
         return { prefs -> prefs.getString(key, fallbackValue) == expectedValue }
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 }

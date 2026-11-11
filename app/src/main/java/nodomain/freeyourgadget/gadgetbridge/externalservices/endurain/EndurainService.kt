@@ -17,27 +17,34 @@
 package nodomain.freeyourgadget.gadgetbridge.externalservices.endurain
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.fragment.app.Fragment
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploader
 import nodomain.freeyourgadget.gadgetbridge.externalservices.AuthStyle
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceCalls
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceTokenRefreshWorker
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import org.slf4j.LoggerFactory
 
 object EndurainService : ExternalService {
     override val id = "endurain"
-    override val nameRes = R.string.pref_category_endurain
+    override val nameRes = R.string.service_name_endurain
     override val authStyle = AuthStyle.LOGIN
 
     /**
-     * Version the server reported when it was last asked, for the settings summary. Kept here
-     * rather than on a screen so it survives the screen being closed and reopened.
+     * Version the server reported when it was last asked, and that server's address, for the
+     * settings summary. Kept here rather than on a screen so it survives the screen being closed
+     * and reopened.
      */
     @Volatile
-    var serverVersion: String? = null
+    private var serverVersion: Pair<String, String>? = null
 
     override fun isLoggedIn(context: Context) =
         serverUrl() != null && EndurainTokenManager(context).isLoggedIn()
@@ -47,14 +54,16 @@ object EndurainService : ExternalService {
         val tokenManager = EndurainTokenManager(context)
         var summary = if (tokenManager.isLoggedIn() && server != null) {
             context.getString(
-                R.string.endurain_logged_in_refresh_token,
+                R.string.service_logged_in_refresh_token,
                 server,
                 DateTimeUtils.parseTimeStamp(tokenManager.getRefreshTokenExpiresAt())
             )
         } else {
-            context.getString(R.string.endurain_not_logged_in_integration_disabled)
+            context.getString(R.string.service_not_logged_in)
         }
-        serverVersion?.let { summary += context.getString(R.string.endurain_server_version, it) }
+        serverVersion?.takeIf { it.first == server }?.let {
+            summary += context.getString(R.string.service_server_version, it.second)
+        }
         return summary
     }
 
@@ -67,7 +76,7 @@ object EndurainService : ExternalService {
         }
         Thread {
             serverVersion = try {
-                EndurainApiClient(server, tokenManager).fetchVersion()
+                EndurainApiClient(server, tokenManager).fetchVersion()?.let { server to it }
             } catch (e: Exception) {
                 LOG.error("Fetching the Endurain server version failed", e)
                 null
@@ -80,19 +89,42 @@ object EndurainService : ExternalService {
         EndurainSetupBottomSheet().show(fragment.parentFragmentManager, "endurain_setup")
     }
 
-    /**
-     * The session may well be gone on the server already, and a user who cannot reach it still has
-     * to be able to disconnect, so the credentials go either way and the logout counts as done.
-     */
     override fun logout(context: Context): Boolean {
         val tokenManager = EndurainTokenManager(context)
-        serverUrl()?.let { server ->
-            if (!EndurainApiClient(server, tokenManager).logout()) {
-                LOG.warn("Could not tell Endurain about the logout")
-            }
-        }
+        val confirmed = serverUrl()?.let { EndurainApiClient(it, tokenManager).logout() } ?: true
         tokenManager.clearTokens()
-        return true
+        return confirmed
+    }
+
+    /** The refresh token expires, so it is renewed on a schedule rather than at the next upload. */
+    override fun scheduleBackgroundWork(context: Context) {
+        ExternalServiceTokenRefreshWorker.schedule(context, this)
+    }
+
+    override fun credentialsExpired(context: Context): Boolean =
+        EndurainTokenManager(context).isAccessTokenExpired()
+
+    override fun refreshCredentials(context: Context): Boolean {
+        val server = serverUrl() ?: return false
+        return ExternalServiceCalls.await<Boolean>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
+            EndurainTokenManager(context).performTokenRefresh(server) { done(it) }
+        } == true
+    }
+
+    /**
+     * Endurain brokers the identity provider itself, so the link comes back naming a session on
+     * the server rather than an authorization code, and the setup wizard collects the tokens.
+     */
+    override fun onLoginCallback(context: Context, uri: Uri) {
+        val sessionId = uri.getQueryParameter("session_id")
+        val result = Intent(SSO_CALLBACK_ACTION).apply {
+            putExtra("session_id", sessionId)
+            putExtra("success", sessionId != null)
+        }
+        if (sessionId == null) {
+            LOG.error("SSO callback carried no session id")
+        }
+        LocalBroadcastManager.getInstance(context).sendBroadcast(result)
     }
 
     /**
@@ -116,4 +148,7 @@ object EndurainService : ExternalService {
     }
 
     private val LOG = LoggerFactory.getLogger(EndurainService::class.java)
+
+    /** Where the setup wizard listens for the outcome of a browser login. */
+    const val SSO_CALLBACK_ACTION = "nodomain.freeyourgadget.gadgetbridge.ENDURAIN_SSO_CALLBACK"
 }

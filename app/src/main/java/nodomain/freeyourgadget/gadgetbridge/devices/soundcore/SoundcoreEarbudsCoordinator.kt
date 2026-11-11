@@ -23,14 +23,24 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.getOverriddenFeatures
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.overrideFeatures
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.volume
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlOption
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlToggleGroup
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControls
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizer
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizerPresets
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
 
 abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator() {
@@ -58,6 +68,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         AudioEqualizer,
         GamingMode,
         VoicePrompts,
+        AudioBalance,
+        Volume,
+        ColorfulLights,
         ButtonBrightness,
         LDAC,
         AdaptiveDirection,
@@ -95,6 +108,56 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         ),
     }
 
+    enum class AncMode(
+        private val preferenceValue: String,
+        private val byteValue: Byte,
+    ) {
+        TRANSPORT("transport", 0x00),
+        OUTDOOR("outdoor", 0x01),
+        INDOOR("indoor", 0x02);
+
+        override fun toString(): String = preferenceValue
+
+        fun toByte(): Byte = byteValue
+
+        companion object {
+            @JvmStatic
+            fun fromPreference(preferenceValue: String?): AncMode? =
+                entries.find { it.preferenceValue == preferenceValue }
+
+            /** Unknown codes retain the calling protocol's fallback. */
+            @JvmStatic
+            fun fromByte(byteValue: Byte): AncMode? = entries.find { it.byteValue == byteValue }
+        }
+    }
+
+    enum class AmbientSoundMode(
+        private val preferenceValue: String,
+        private val byteValue: Byte,
+        @androidx.annotation.StringRes val label: Int,
+    ) {
+        NOISE_CANCELLING("noise_cancelling", 0x00, R.string.sony_ambient_sound_noise_cancelling),
+        AMBIENT_SOUND("ambient_sound", 0x01, R.string.sony_ambient_sound_ambient_sound),
+        OFF("off", 0x02, R.string.sony_ambient_sound_off),
+        // Model-specific aliases follow the standard modes to preserve fromByte lookups.
+        TRANSPARENCY("transparency", 0x01, R.string.prefs_active_noise_cancelling_transparency),
+        ADAPTIVE_ANC("adaptive_anc", 0x00, R.string.pref_adaptive_noise_cancelling_title);
+
+        override fun toString(): String = preferenceValue
+
+        fun toByte(): Byte = byteValue
+
+        companion object {
+            @JvmStatic
+            fun fromPreference(preferenceValue: String?): AmbientSoundMode? =
+                entries.find { it.preferenceValue == preferenceValue }
+
+            @JvmStatic
+            fun fromByte(byteValue: Byte): AmbientSoundMode =
+                entries.find { it.byteValue == byteValue } ?: OFF
+        }
+    }
+
     enum class TapFunction(
         val code: Int,
         @androidx.annotation.StringRes val label: Int,
@@ -106,6 +169,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         PLAYPAUSE(6, R.string.pref_media_playpause),
         VOICE_ASSISTANT(5, R.string.pref_title_touch_voice_assistant),
         AMBIENT_SOUND_CONTROL(4, R.string.sony_button_mode_ambient_sound_control),
+        COLORFUL_LIGHTS(14, R.string.soundcore_colorful_lights),
         NONE(15, R.string.none),
 
         ;
@@ -121,22 +185,38 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         get() = emptyList()
 
     /* TIP: Override this function in case you need conditions/exclusions based on Action. */
-    open fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> = supportedTapFunctions
+    open fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> =
+        when (action) {
+            ButtonAction.SINGLE_TAP -> supportedTapFunctions.filterNot {
+                it == TapFunction.VOICE_ASSISTANT ||
+                it == TapFunction.AMBIENT_SOUND_CONTROL
+            }
+            else -> supportedTapFunctions
+        }
 
     override fun getDefaultIconResource(): Int = R.drawable.ic_device_galaxy_buds
 
     /* IMPORTANT: To dynamically set the UUID, set this string in your coordinator. */
     open fun getModelName(): String = "0"
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
-        SoundcoreDeviceSupport::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport =
+        SoundcoreDeviceSupport()
 
     /** Multipoint activity commands supported by this model. */
-    open fun getSupportedMultipointActions(): Set<String> = emptySet()
+    open fun getSupportedMultipointActions(): Set<String> = setOf(
+        MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES,
+        MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS,
+        MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING,
+    )
 
     /** Creates the protocol implementation for this model. */
     open fun createProtocol(device: GBDevice): SoundcoreProtocolImplV1 =
-        throw UnsupportedOperationException("Soundcore coordinator must provide its protocol factory")
+        SoundcoreProtocolImplV1(device)
 
     /** Overrides the model-derived control service for devices using a different service. */
     open fun getServiceUUID(): UUID? = null
@@ -156,6 +236,10 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     override fun getBatteryCount(device: GBDevice): Int = 3
 
+    data class BatteryProperties(val multiplier: Int = 20, val offset: Int = 0)
+
+    open fun getBatteryProperties(): BatteryProperties = BatteryProperties()
+
     override fun getBatteryConfig(device: GBDevice): Array<BatteryConfig> =
         when (getBatteryCount(device)) {
             1 -> arrayOf(BatteryConfig(0, R.drawable.ic_battery, R.string.battery))
@@ -170,11 +254,23 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
             )
         }
 
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
+
     override fun supportsFindDevice(device: GBDevice): Boolean =
         getCapabilities(device).contains(Capability.FindDevice)
 
     override fun supportsFindDevicePerEarbud(device: GBDevice): Boolean =
         supportsFindDevice(device) && getDeviceKind(device) == DeviceCoordinator.DeviceKind.EARBUDS
+
+    override fun supportsLedColor(device: GBDevice): Boolean =
+        supports(device, Capability.ColorfulLights)
+
+    override fun supportsRgbLedColor(device: GBDevice): Boolean =
+        supports(device, Capability.ColorfulLights)
 
     override fun getSupportedDeviceSpecificConnectionSettings(): IntArray =
         connectionSettings + super.getSupportedDeviceSpecificConnectionSettings()
@@ -196,76 +292,76 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getDefaultCapabilities(): Set<Capability> = emptySet()
 
-    open fun getCapabilities(device: GBDevice): Set<Capability> {
-        val devicePrefs = GBApplication.getDevicePrefs(device)
-        if (devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_OVERRIDE_FEATURES_ENABLED, false)) {
-            return devicePrefs.getStringSet(
-                DeviceSettingsPreferenceConst.PREF_OVERRIDE_FEATURES_LIST,
-                emptySet(),
-            ).mapNotNullTo(mutableSetOf()) { name -> Capability.values().firstOrNull { it.name == name } }
-        }
-
-        return getDefaultCapabilities()
-    }
+    open fun getCapabilities(device: GBDevice): Set<Capability> =
+        getOverriddenFeatures(device, getDefaultCapabilities())
 
     fun supports(device: GBDevice, capability: Capability): Boolean =
         getCapabilities(device).contains(capability)
 
-    open fun getNoiseCancellationLevelRange(): IntRange = 0..2
+    open fun getNoiseCancellationLevelRange(): ByteArray = byteArrayOf(0x00, 0x10, 0x20, 0x30)
 
     open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
 
+    open fun getVolumeMax(): Int = 100
+
+    open fun getDefaultEqualizerCommand(): String = "default"
+
     open fun getEqualizerVolumeRange(): IntRange = -6..6
 
-    open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
+    open fun getSupportedEqualizerBands(): IntArray = intArrayOf(
+        100, 200, 400, 800, 1600, 3200, 6400, 12800,
+    )
 
     /** Per-band frequency choices in protocol index order. */
     open fun getSupportedEqualizerBandsRanges(): Array<IntArray> = emptyArray()
 
-    /**
-     * Returns preset label resources whose values map to zero-based preset indices.
-     * The Custom option (value 254) is appended automatically and must not be included here.
-     */
-    open fun getCustomEqualizerPresetNames(): Array<Int> = emptyArray()
+    /** Returns the supported presets, including Custom, with their protocol IDs and label resources. */
+    open fun getCustomEqualizerPresetNames(): List<SoundcoreEqualizer> = SoundcoreEqualizerPresets.PRESETS
 
-    open fun getCustomEqualizerPresetArray(): Int? = null
-
-    open fun getDefaultEqualizerPresetNames(): Array<Int> = arrayOf(
-        R.string.soundcore_equalizer_preset_signature,
-        R.string.soundcore_equalizer_preset_xtra_bass,
-        R.string.soundcore_equalizer_preset_voice,
-        R.string.soundcore_equalizer_preset_balanced,
-    )
-
-    private fun getEqualizerPresetEntries(): List<ListEntry> {
-        val customPresetNames = getCustomEqualizerPresetNames()
-        if (customPresetNames.isNotEmpty()) {
-            return customPresetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
-                ListEntry.Res("254", R.string.custom)
-        }
-
-        val presetNamesArray = getCustomEqualizerPresetArray()
-        val presetNames = if (presetNamesArray == null) {
-            getDefaultEqualizerPresetNames().toList()
-        } else {
-            val typedArray = GBApplication.getContext().resources.obtainTypedArray(presetNamesArray)
-            try {
-                (0 until typedArray.length()).mapNotNull { index ->
-                    typedArray.getResourceId(index, 0).takeIf { it != 0 && it != R.string.custom }
-                }
-            } finally {
-                typedArray.recycle()
-            }
-        }
-        require(presetNames.isNotEmpty()) { "Equalizer preset names must not be empty" }
-        return presetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
-            ListEntry.Res("254", R.string.custom)
-    }
+    private fun getEqualizerPresetEntries(): List<ListEntry> =
+        getCustomEqualizerPresetNames().map { preset -> ListEntry.Res(preset.index.toString(), preset.label) }
 
     private fun formatEqualizerFrequency(frequency: Int): String = if (frequency < 1000) {
         "$frequency Hz"
     } else {
         "${(frequency / 1000.0).toString().removeSuffix(".0")} kHz"
+    }
+
+    override fun getQuickControls(device: GBDevice): List<QuickControl> {
+        val capabilities = getCapabilities(device)
+        fun has(capability: Capability) = capabilities.contains(capability)
+        fun has(anyOf: Array<Capability>) = anyOf.any { capabilities.contains(it) }
+
+        return listOf(
+            QuickControlToggleGroup.forPreference(
+                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
+                title = R.string.prefs_noise_control,
+                icon = R.drawable.ic_hearing,
+                defaultValue = AmbientSoundMode.OFF.toString(),
+                visible = { it.isConnected && has(arrayOf(Capability.NoiseControl, Capability.AdaptiveNoiseCancellationMode, Capability.AmbientSound, Capability.Transparency)) },
+                options = buildList {
+                    add(QuickControlOption(
+                        AmbientSoundMode.OFF.toString(),
+                        R.string.sony_ambient_sound_off,
+                        R.drawable.ic_hearing_disabled,
+                    ))
+                    if (has(Capability.NoiseControl) || has(Capability.AdaptiveNoiseCancellationMode)) {
+                        add(QuickControlOption(
+                            (if (has(Capability.NoiseControl)) AmbientSoundMode.NOISE_CANCELLING else AmbientSoundMode.ADAPTIVE_ANC).toString(),
+                            if (has(Capability.NoiseControl)) R.string.sony_ambient_sound_noise_cancelling_short else R.string.pref_adaptive_noise_cancelling_title,
+                            R.drawable.ic_noise_control_on,
+                        ))
+                    }
+                    if (has(Capability.AmbientSound) || has(Capability.Transparency)) {
+                        add(QuickControlOption(
+                            (if (has(Capability.AmbientSound)) AmbientSoundMode.AMBIENT_SOUND else AmbientSoundMode.TRANSPARENCY).toString(),
+                            R.string.sony_ambient_sound_ambient_sound_short,
+                            R.drawable.ic_hearing,
+                        ))
+                    }
+                },
+            ),
+        )
     }
 
     /**
@@ -354,12 +450,81 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
+            if (has(Capability.ColorfulLights)) {
+                screen(
+                    key = "pref_soundcore_light_screen",
+                    title = R.string.soundcore_colorful_lights,
+                    icon = R.drawable.ic_lightbulb,
+                ) {
+                    switchSetting(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                        title = R.string.soundcore_colorful_lights,
+                        icon = R.drawable.ic_lightbulb,
+                    )
+                    list(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE,
+                        title = R.string.soundcore_light_mode,
+                        icon = R.drawable.ic_light_mode_auto,
+                        entries = listOf(
+                            ListEntry.Res("0", R.string.soundcore_light_effect_on),
+                            ListEntry.Res("1", R.string.soundcore_light_effect_breathing),
+                            ListEntry.Res("2", R.string.soundcore_light_effect_flash),
+                            ListEntry.Res("3", R.string.soundcore_light_effect_music),
+                        ),
+                        defaultValue = "0",
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_BRIGHTNESS,
+                        title = R.string.menuitem_brightness,
+                        icon = R.drawable.ic_wb_sunny,
+                        min = 1, max = 10, defaultValue = 5,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
+                        title = R.string.sony_automatic_power_off,
+                        icon = R.drawable.ic_timer,
+                        min = 1, max = 120, defaultValue = 45,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                    )
+                    val channels = listOf(
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, R.string.red, 23),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, R.string.green, 187),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, R.string.blue, 239),
+                    )
+                    channels.forEach { (key, title, initialValue) ->
+                        seekbar(
+                            key = key, title = title,
+                            icon = R.drawable.ic_led_color,
+                            min = 0,
+                            max = 255,
+                            defaultValue = initialValue,
+                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                        )
+                    }
+                }
+            }
+
+            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance, Capability.Volume))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
                     icon = R.drawable.ic_music_note,
                 ) {
+                    if (has(Capability.Volume)) {
+                        volume(max = getVolumeMax(), defaultValue = (getVolumeMax() / 2).toInt())
+                    }
+                    if (has(Capability.AudioBalance)) {
+                        seekbar(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE,
+                            title = R.string.pref_balance,
+                            icon = R.drawable.ic_balance,
+                            min = -6,
+                            max = 6,
+                            defaultValue = 0,
+                        )
+                    }
                     if (has(Capability.GamingMode)) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE,
@@ -387,6 +552,20 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     if (has(Capability.AudioEqualizer)) {
                         val equalizerPresetEntries = getEqualizerPresetEntries()
                         category(key = "pref_header_soundcore_equalizer", title = R.string.pref_header_equalizer) {
+                            if (GBApplication.getPrefs().experimentalSettings()) {
+                                list(
+                                    key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_COMMAND,
+                                    title = R.string.soundcore_equalizer_command,
+                                    // summary = R.string.pref_experimental_settings_summary,
+                                    icon = R.drawable.ic_science,
+                                    entries = listOf(
+                                        ListEntry.Res("default", R.string.pref_default),
+                                        ListEntry.Res("compact", R.string.soundcore_equalizer_command_compact),
+                                    ),
+                                    defaultValue = getDefaultEqualizerCommand(),
+                                    connectedOnly = false,
+                                )
+                            }
                             if (has(Capability.AdaptiveDirection)) {
                                 switchSetting(
                                     key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_DIRECTION,
@@ -408,6 +587,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 title = R.string.soundcore_equalizer_custom_title,
                                 summary = R.string.soundcore_equalizer_custom_summary,
                                 icon = R.drawable.ic_graphic_eq,
+                                visibleWhen = { SoundcoreEqualizerPresets.CUSTOM in getCustomEqualizerPresetNames() },
                                 enabled = { prefs ->
                                     prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0") == "254"
                                 },
@@ -528,27 +708,27 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
             if (has(arrayOf(Capability.NoiseControl, Capability.AmbientSound))) {
                 val ambientSoundControlEntries = buildList {
-                    add(ListEntry.Res("off", R.string.sony_ambient_sound_off))
+                    add(AmbientSoundMode.OFF)
                     if (has(Capability.Transparency)) {
-                        add(ListEntry.Res("transparency", R.string.prefs_active_noise_cancelling_transparency))
+                        add(AmbientSoundMode.TRANSPARENCY)
                     }
                     if (has(Capability.NoiseControl)) {
-                        add(ListEntry.Res("noise_cancelling", R.string.sony_ambient_sound_noise_cancelling))
+                        add(AmbientSoundMode.NOISE_CANCELLING)
                     }
                     if (has(Capability.AdaptiveNoiseCancellationMode)) {
-                        add(ListEntry.Res("adaptive_anc", R.string.pref_adaptive_noise_cancelling_title))
+                        add(AmbientSoundMode.ADAPTIVE_ANC)
                     }
                     if (has(Capability.AmbientSound)) {
-                        add(ListEntry.Res("ambient_sound", R.string.sony_ambient_sound_ambient_sound))
+                        add(AmbientSoundMode.AMBIENT_SOUND)
                     }
-                }
+                }.map { ListEntry.Res(it.toString(), it.label) }
                 category(key = "pref_header_soundcore_ambient_sound_control", title = R.string.pref_header_sony_ambient_sound_control) {
                     list(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                         title = R.string.sony_ambient_sound,
                         icon = R.drawable.ic_hearing,
                         entries = ambientSoundControlEntries,
-                        defaultValue = "off",
+                        defaultValue = AmbientSoundMode.OFF.toString(),
                     )
                     if (has(Capability.NoiseCancellationModes)) {
                         list(
@@ -572,14 +752,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         )
                     }
                     if (has(Capability.AdaptiveNoiseCancellation)) {
-                        val levelRange = getNoiseCancellationLevelRange()
+                        val levelRange = getNoiseCancellationLevelRange().indices
                         seekbar(
                             key = DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
                             title = R.string.prefs_active_noise_cancelling_level,
                             icon = R.drawable.ic_hearing,
-                            min = levelRange.first,
+                            min = 1,
                             max = levelRange.last,
-                            defaultValue = levelRange.first,
+                            defaultValue = 1,
                             dependency = if (separateAdaptiveToggle) DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING else null,
                         )
                     }
@@ -599,6 +779,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
+
             if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {
@@ -678,12 +859,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            screen(
-                key = DeviceSpecificSettingsScreen.CONNECTION.key,
-                title = R.string.pref_header_connection,
-                icon = R.drawable.ic_mtu,
-            ) {
-                if (has(Capability.Multipoint)) {
+            if (has(Capability.Multipoint)) {
+                screen(
+                    key = DeviceSpecificSettingsScreen.CONNECTION.key,
+                    title = R.string.pref_header_connection,
+                    icon = R.drawable.ic_mtu,
+                ) {
                     multipointPairing()
                 }
             }
@@ -693,6 +874,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 R.xml.devicesettings_headphones,
                 connectedOnly = false,
             )
+
+            screen(
+                key = DeviceSpecificSettingsScreen.DEVELOPER.key,
+                title = DeviceSpecificSettingsScreen.DEVELOPER.title,
+                icon = R.drawable.ic_developer_mode,
+            ) {
+                overrideFeatures(device, getDefaultCapabilities())
+            }
         }
     }
 

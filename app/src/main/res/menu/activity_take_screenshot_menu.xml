@@ -45,6 +45,12 @@
                 android:icon="@drawable/ic_edit"
                 android:title="@string/activity_summary_trim_title"
                 app:showAsAction="never" />
+
+            <item
+                android:id="@+id/activity_action_delete"
+                android:icon="@drawable/ic_delete_forever"
+                android:title="@string/delete"
+                app:showAsAction="never" />
         </menu>
     </item>
 

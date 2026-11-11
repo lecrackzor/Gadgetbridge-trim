@@ -119,7 +119,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public final Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
+    public final DeviceSupport createDeviceSupport(@NonNull final GBDevice device) {
         // Prioritize user choice
         DeviceCoordinator.ConnectionType connType = GBApplication.getDevicePrefs(device).getForcedConnectionTypeFromPrefs();
         if (connType == DeviceCoordinator.ConnectionType.BOTH) {
@@ -127,8 +127,8 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         }
 
         return switch (connType) {
-            case BOTH, BT_CLASSIC -> ZeppOsBtbrSupport.class;
-            default -> ZeppOsBtleSupport.class;
+            case BOTH, BT_CLASSIC -> new ZeppOsBtbrSupport();
+            default -> new ZeppOsBtleSupport();
         };
     }
 
@@ -247,7 +247,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @Override
     public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
-        return !hasDisplay() || supportsDisplayItem(device, "hrv") || supportsDisplayItem(device, "readiness");
+        return !hasDisplay() || supportsDisplayItem(device, "hrv") || supportsDisplayItem(device, "readiness") || supportsDisplayItem(device, "bio_charge");
     }
 
     @Override
@@ -307,7 +307,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new ZeppOsActivitySummaryParser(context);
+        return new ZeppOsActivitySummaryParser(context, device);
     }
 
     @Override
@@ -712,6 +712,11 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return hasDisplay();
     }
 
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return supportsPhoneCalls(device) && hasDisplay();
+    }
+
     public boolean supportsMusicUpload(final GBDevice device) {
         return supportsDisplayItem(device, "music") &&
             (supportsBleFileTransfer(device, "music") || supportsWifiFtp(device));
@@ -747,5 +752,25 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
                 .stream()
                 .map(BarcodeFormat::valueOf)
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public boolean supportsInternetAccess(@NonNull final GBDevice device) {
+        return supportsWifiHotspot(device);
+    }
+
+    @Override
+    public boolean supportsSmsReply(@NonNull final GBDevice device) {
+        return getCannedRepliesSlotCount(device) > 0;
+    }
+
+    @Override
+    public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
+        return hasDisplay();
+    }
+
+    @Override
+    public boolean supportsGpsSharing(@NonNull final GBDevice device) {
+        return hasDisplay() && !hasGps(device);
     }
 }

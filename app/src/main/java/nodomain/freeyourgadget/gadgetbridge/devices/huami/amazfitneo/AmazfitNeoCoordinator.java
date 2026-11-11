@@ -72,6 +72,11 @@ public class AmazfitNeoCoordinator extends HuamiCoordinator {
     }
 
     @Override
+    public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public int getWorldClocksSlotCount() {
         return 20; // max in Zepp app
     }
@@ -133,8 +138,8 @@ public class AmazfitNeoCoordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return AmazfitNeoSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new AmazfitNeoSupport();
     }
 
     @Override

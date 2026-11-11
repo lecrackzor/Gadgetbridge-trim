@@ -1,14 +1,8 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.debug
 
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.LayerDrawable
 import android.text.InputType
-import android.view.ContextThemeWrapper
 import android.widget.Toast
 import androidx.annotation.DrawableRes
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -19,7 +13,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragment
+import nodomain.freeyourgadget.gadgetbridge.activities.AbstractSettingsActivityV2
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.util.DeviceIconUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import java.util.UUID
 
@@ -124,29 +120,9 @@ abstract class AbstractDebugFragment : AbstractPreferenceFragment() {
         onClickFunction: () -> Unit,
     ): Preference {
         val pref = addDynamicPref(group, title, summary, onClickFunction = onClickFunction)
-        pref.layoutResource = R.layout.preference_debug_device
-        pref.icon = deviceIcon(icon, connected)
+        pref.layoutResource = R.layout.preference_device
+        pref.icon = DeviceIconUtils.tile(requireContext(), icon, connected)
         return pref
-    }
-
-    private fun deviceIcon(@DrawableRes iconRes: Int, connected: Boolean): Drawable {
-        val iconContext = ContextThemeWrapper(
-            requireContext(),
-            if (connected) R.style.ThemeOverlay_App_DeviceCardIcon_Connected else R.style.ThemeOverlay_App_DeviceCardIcon
-        )
-        val tile = AppCompatResources.getDrawable(iconContext, R.drawable.device_card_icon_bg)!!
-        val icon = AppCompatResources.getDrawable(iconContext, iconRes)!!
-        if (!connected) {
-            icon.colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
-        }
-
-        val tileSize = resources.getDimensionPixelSize(R.dimen.debug_device_icon_size)
-        val iconInset = resources.getDimensionPixelSize(R.dimen.debug_device_icon_inset)
-        return LayerDrawable(arrayOf(tile, icon)).apply {
-            setLayerSize(0, tileSize, tileSize)
-            setLayerInset(1, iconInset, iconInset, 0, 0)
-            setLayerSize(1, tileSize - iconInset, tileSize - iconInset)
-        }
     }
 
     protected fun addDynamicCategory(title: String) {
@@ -185,10 +161,7 @@ abstract class AbstractDebugFragment : AbstractPreferenceFragment() {
     }
 
     protected fun goTo(fragment: AbstractDebugFragment) {
-        requireActivity().supportFragmentManager.beginTransaction()
-            .replace(R.id.settings_container, fragment)
-            .addToBackStack(null)
-            .commit()
+        (requireActivity() as AbstractSettingsActivityV2).goToScreen(fragment, null, null)
     }
 
     companion object {

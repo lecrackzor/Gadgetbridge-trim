@@ -20,6 +20,7 @@ import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.CyclingPedalingCadenceRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ElevationGainedRecord
+import androidx.health.connect.client.records.ExerciseSegment
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.PowerRecord
@@ -29,7 +30,14 @@ import androidx.health.connect.client.records.StepsCadenceRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.ExerciseCategory
+import org.slf4j.LoggerFactory
+import java.time.Instant
+import kotlin.math.roundToLong
 import kotlin.reflect.KClass
+
+private val LOG = LoggerFactory.getLogger(WorkoutSyncerUtils::class.java)
 
 /**
  * Shared utilities for workout syncing.
@@ -125,7 +133,8 @@ internal object WorkoutSyncerUtils {
             ActivityKind.AMERICAN_FOOTBALL -> ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AMERICAN
             ActivityKind.AUSTRALIAN_FOOTBALL -> ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AUSTRALIAN
             ActivityKind.RUGBY -> ExerciseSessionRecord.EXERCISE_TYPE_RUGBY
-            ActivityKind.CARDIO, ActivityKind.AEROBICS, ActivityKind.AEROBIC_EXERCISE, ActivityKind.AEROBIC_COMBO, ActivityKind.STEP_AEROBICS -> ExerciseSessionRecord.EXERCISE_TYPE_DANCING
+            ActivityKind.CARDIO -> ExerciseSessionRecord.EXERCISE_TYPE_DANCING
+            ActivityKind.AEROBICS, ActivityKind.AEROBIC_EXERCISE, ActivityKind.AEROBIC_COMBO, ActivityKind.STEP_AEROBICS -> ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS
             ActivityKind.BREATHWORK -> ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING
             ActivityKind.MEDITATION, ActivityKind.MIND_AND_BODY -> ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING
             ActivityKind.INDOOR_WALKING -> ExerciseSessionRecord.EXERCISE_TYPE_WALKING
@@ -153,8 +162,9 @@ internal object WorkoutSyncerUtils {
             ActivityKind.MIXED_MARTIAL_ARTS, ActivityKind.FREE_SPARRING, ActivityKind.BODY_COMBAT, ActivityKind.CARDIO_COMBAT, ActivityKind.MMA_HIIT -> ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS
             ActivityKind.DANCE, ActivityKind.BELLY_DANCE, ActivityKind.JAZZ_DANCE, ActivityKind.LATIN_DANCE, ActivityKind.BALLET, ActivityKind.STREET_DANCE, ActivityKind.ZUMBA, ActivityKind.BALLROOM_DANCE, ActivityKind.BREAKING, ActivityKind.FOLK_DANCE, ActivityKind.HIP_HOP, ActivityKind.MODERN_DANCE, ActivityKind.POLE_DANCE, ActivityKind.SQUARE_DANCE, ActivityKind.PLAZA_DANCING -> ExerciseSessionRecord.EXERCISE_TYPE_DANCING
             ActivityKind.KICKBOXING, ActivityKind.TAE_BO -> ExerciseSessionRecord.EXERCISE_TYPE_BOXING
-            ActivityKind.CROSSFIT, ActivityKind.FUNCTIONAL_TRAINING, ActivityKind.PHYSICAL_TRAINING, ActivityKind.FREE_TRAINING, ActivityKind.FITNESS_EXERCISES -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
+            ActivityKind.FUNCTIONAL_TRAINING, ActivityKind.PHYSICAL_TRAINING, ActivityKind.FREE_TRAINING, ActivityKind.FITNESS_EXERCISES -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
             ActivityKind.TAEKWONDO, ActivityKind.KARATE, ActivityKind.JUDO, ActivityKind.JUJITSU, ActivityKind.KENDO, ActivityKind.MUAY_THAI, ActivityKind.MARTIAL_ARTS -> ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS
+            ActivityKind.CROSSFIT -> ExerciseSessionRecord.EXERCISE_TYPE_BOOT_CAMP
             ActivityKind.FENCING -> ExerciseSessionRecord.EXERCISE_TYPE_FENCING
             ActivityKind.CORE_TRAINING -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
             ActivityKind.HORIZONTAL_BAR, ActivityKind.PARALLEL_BAR, ActivityKind.PARALLEL_BARS, ActivityKind.MASS_GYMNASTICS -> ExerciseSessionRecord.EXERCISE_TYPE_GYMNASTICS
@@ -209,4 +219,93 @@ internal object WorkoutSyncerUtils {
             else -> ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT
         }
     }
+
+    private val SEGMENT_SESSION_TYPES = setOf(
+        ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+        ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING
+    )
+
+    fun usesSetSegments(exerciseType: Int): Boolean = exerciseType in SEGMENT_SESSION_TYPES
+
+    /**
+     * Builds Health Connect exercise segments from FIT set messages. Health Connect has no
+     * field for lifted weight, so sets carry only their exercise type and repetitions.
+     */
+    fun buildExerciseSegments(
+        sets: List<ActivityTrack.SetInfo>,
+        sessionStart: Instant,
+        sessionEnd: Instant,
+        exerciseType: Int
+    ): List<ExerciseSegment> {
+        if (sets.isEmpty() || !usesSetSegments(exerciseType)) {
+            return emptyList()
+        }
+
+        val sortedSets = sets.sortedBy { it.startTimeSec }
+
+        val segments = ArrayList<ExerciseSegment>()
+        for ((index, set) in sortedSets.withIndex()) {
+            if (set.setType == 0) continue
+            val setStart = Instant.ofEpochSecond(set.startTimeSec)
+            val nextStart = sortedSets.getOrNull(index + 1)?.let { Instant.ofEpochSecond(it.startTimeSec) }
+            val start = maxOf(setStart, sessionStart)
+            val durationSec = set.durationSec
+
+            var end = when {
+                durationSec != null && durationSec > 0.0 ->
+                    setStart.plusMillis((durationSec * 1000.0).roundToLong())
+                nextStart != null -> nextStart
+                else -> {
+                    LOG.debug("Dropping set at {} with no duration and no following set", setStart)
+                    continue
+                }
+            }
+            if (nextStart != null && end.isAfter(nextStart)) {
+                LOG.debug("Set at {} runs into the next set, clipping end to {}", setStart, nextStart)
+                end = nextStart
+            }
+            end = minOf(end, sessionEnd)
+            if (!start.isBefore(end)) {
+                LOG.debug("Dropping set at {} with no time left inside the session", setStart)
+                continue
+            }
+
+            segments.add(
+                ExerciseSegment(
+                    startTime = start,
+                    endTime = end,
+                    segmentType = mapExerciseCategoryToSegmentType(set.exerciseCategory),
+                    repetitions = maxOf(set.repetitions ?: 0, 0)
+                )
+            )
+        }
+        return segments
+    }
+
+    /**
+     * Maps a Garmin exercise category to a Health Connect segment type. Only types that
+     * Health Connect accepts inside a strength-training session are returned. Named only
+     * from the category: a category with several variants maps to other-workout, and the
+     * subtype is kept for the export round-trip rather than for naming the segment.
+     */
+    fun mapExerciseCategoryToSegmentType(category: ExerciseCategory?): Int =
+        when (category) {
+            ExerciseCategory.CATEGORY_BENCH_PRESS -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BENCH_PRESS
+            ExerciseCategory.CATEGORY_CRUNCH -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_CRUNCH
+            ExerciseCategory.CATEGORY_CURL -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_ARM_CURL
+            ExerciseCategory.CATEGORY_DEADLIFT -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DEADLIFT
+            ExerciseCategory.CATEGORY_HIP_RAISE -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_HIP_THRUST
+            ExerciseCategory.CATEGORY_HIP_SWING -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_KETTLEBELL_SWING
+            ExerciseCategory.CATEGORY_HYPEREXTENSION -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BACK_EXTENSION
+            ExerciseCategory.CATEGORY_LATERAL_RAISE -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LATERAL_RAISE
+            ExerciseCategory.CATEGORY_LEG_CURL -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL
+            ExerciseCategory.CATEGORY_LEG_RAISE -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_RAISE
+            ExerciseCategory.CATEGORY_LUNGE -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LUNGE
+            ExerciseCategory.CATEGORY_PLANK -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PLANK
+            ExerciseCategory.CATEGORY_PULL_UP -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PULL_UP
+            ExerciseCategory.CATEGORY_SHOULDER_PRESS -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SHOULDER_PRESS
+            ExerciseCategory.CATEGORY_SIT_UP -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SIT_UP
+            ExerciseCategory.CATEGORY_SQUAT -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SQUAT
+            else -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_OTHER_WORKOUT
+        }
 }

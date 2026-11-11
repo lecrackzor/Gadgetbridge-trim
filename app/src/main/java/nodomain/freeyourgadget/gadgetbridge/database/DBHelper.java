@@ -359,6 +359,15 @@ public class DBHelper {
         return null;
     }
 
+    @Nullable
+    public static User findUser(@NonNull final DaoSession session) {
+        final List<User> users = session.getUserDao().loadAll();
+        if (users.isEmpty()) {
+            return null;
+        }
+        return users.get(0);
+    }
+
     public static void updateDeviceMacAddress(final DaoSession session, final String oldAddress, final String newAddress) {
         final DeviceDao deviceDao = session.getDeviceDao();
         final Query<Device> query = deviceDao.queryBuilder().where(DeviceDao.Properties.Identifier.eq(oldAddress)).build();

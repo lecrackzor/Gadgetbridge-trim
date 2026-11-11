@@ -122,6 +122,11 @@ public class RealmeBudsAir6ProCoordinator extends OppoHeadphonesCoordinator {
     }
 
     @Override
+    public boolean supportsAncLevel(@NonNull GBDevice device) {
+        return true;
+    }
+
+    @Override
     protected Map<Pair<TouchConfigSide, TouchConfigType>, List<TouchConfigValue>> getTouchOptions() {
         return new LinkedHashMap<>() {{
             final List<TouchConfigValue> options = Arrays.asList(TouchConfigValue.OFF, TouchConfigValue.PLAY_PAUSE, TouchConfigValue.PREVIOUS, TouchConfigValue.NEXT, TouchConfigValue.VOLUME_UP, TouchConfigValue.VOLUME_DOWN, TouchConfigValue.VOICE_ASSISTANT_REALME, TouchConfigValue.GAME_MODE, TouchConfigValue.NOISE_CONTROL);

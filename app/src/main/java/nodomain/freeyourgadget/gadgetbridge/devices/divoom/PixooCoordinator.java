@@ -44,8 +44,8 @@ public class PixooCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return PixooSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new PixooSupport();
     }
 
     @Override
@@ -66,6 +66,16 @@ public class PixooCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsWeather(final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
         return true;
     }
 

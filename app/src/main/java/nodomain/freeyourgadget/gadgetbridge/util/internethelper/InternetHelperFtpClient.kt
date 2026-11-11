@@ -11,6 +11,7 @@ import nodomain.freeyourgadget.internethelper.aidl.ftp.IFtpService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
+import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.CountDownLatch
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit
  */
 class InternetHelperFtpClient private constructor(
     private val binding: InternetHelperBinding<IFtpService>
-) {
+) : Closeable {
     fun interface ProgressListener {
         fun onProgress(bytes: Long, total: Long)
     }
@@ -239,7 +240,7 @@ class InternetHelperFtpClient private constructor(
         return baos.toByteArray()
     }
 
-    fun close() {
+    override fun close() {
         LOG.debug("Closing FTP client {}", clientId)
         try {
             run("disconnect", null) { binding.service.disconnect(clientId) }

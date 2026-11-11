@@ -99,7 +99,7 @@ object WorkoutUploader {
             val activityTrackProvider = gbDevice.deviceCoordinator
                 .getActivityTrackProvider(gbDevice, context)
             val track = try {
-                ActivitySummaryUtils.resolveExportableTrack(activityTrackProvider, summary)
+                ActivitySummaryUtils.resolveExportableTrack(activityTrackProvider, gbDevice, summary)
             } catch (e: Exception) {
                 LOG.warn("Failed to load activity track for FIT export", e)
                 null
@@ -366,7 +366,7 @@ object WorkoutUploader {
             }
 
             WorkoutPayloadFormat.GPX -> provider?.let {
-                ActivitySummaryUtils.getShareableGpxFile(it, summary)
+                ActivitySummaryUtils.getShareableGpxFile(it, gbDevice, summary)
             }
         }
     }
@@ -727,7 +727,7 @@ object WorkoutUploader {
                 try {
                     var removed = previousMediaId == null
                     if (previousMediaId != null) {
-                        removed = apiClient.deleteActivityMedia(previousMediaId)
+                        removed = apiClient.deleteActivityMedia(activityId, previousMediaId)
                         if (!removed) {
                             // Already gone server-side counts as removed, so a photo replaced
                             // after a manual deletion still goes through.

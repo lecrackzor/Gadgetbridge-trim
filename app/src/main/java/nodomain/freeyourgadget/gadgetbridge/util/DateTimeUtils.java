@@ -77,11 +77,7 @@ public class DateTimeUtils {
     }
 
     public static String formatIso8601(Date date) {
-        if (GBApplication.isRunningNougatOrLater()) {
-            return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(date);
-        }
-        ISO_8601_FORMAT.setTimeZone(TimeZone.getDefault());
-        return ISO_8601_FORMAT.format(date);
+        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(date);
     }
 
     @Nullable
@@ -90,13 +86,9 @@ public class DateTimeUtils {
     }
 
     public static String formatIso8601UTC(Date date) {
-        if (GBApplication.isRunningNougatOrLater()) {
-            final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
-            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-            return sdf.format(date);
-        }
-        ISO_8601_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return ISO_8601_FORMAT.format(date);
+        final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return sdf.format(date);
     }
 
     public static String formatDate(Date date) {
@@ -248,6 +240,16 @@ public class DateTimeUtils {
 
     public static String formatTime(int hours, int minutes) {
         return String.format(Locale.US, "%02d", hours) + ":" + String.format(Locale.US, "%02d", minutes);
+    }
+
+    /**
+     * Returns the offset of the time zone from UTC at the timestamp, for example "UTC+05:30".
+     */
+    public static String formatUtcOffset(final TimeZone timeZone, final long timestamp) {
+        final int offsetMinutes = timeZone.getOffset(timestamp) / 60000;
+        final char sign = offsetMinutes < 0 ? '-' : '+';
+        final int absMinutes = Math.abs(offsetMinutes);
+        return String.format(Locale.ROOT, "UTC%c%02d:%02d", sign, absMinutes / 60, absMinutes % 60);
     }
 
 

@@ -27,6 +27,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
+import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 
 import org.slf4j.Logger;
@@ -104,6 +105,7 @@ public class XiaomiSettingsCustomizer implements DeviceSpecificSettingsCustomize
         if (sleepRespiratoryRatePref != null) {
             sleepRespiratoryRatePref.setVisible(prefs.getBoolean(XiaomiPreferences.FEAT_SLEEP_RESPIRATORY_RATE, false));
         }
+        customizeSpo2Mode(handler, prefs);
 
         populateOrHideListPreference(HuamiConst.PREF_DISPLAY_ITEMS_SORTABLE, handler, prefs);
 
@@ -117,6 +119,33 @@ public class XiaomiSettingsCustomizer implements DeviceSpecificSettingsCustomize
                 "screen_events_forwarding",
                 "phone_silent_mode"
         ));
+    }
+
+    private static void customizeSpo2Mode(final DeviceSpecificSettingsHandler handler, final Prefs prefs) {
+        final ListPreference modePref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_SPO2_MONITORING_MODE);
+        if (modePref == null || !prefs.getBoolean(XiaomiPreferences.FEAT_SPO2_MODE_CHOICE, false)) {
+            return;
+        }
+
+        modePref.setVisible(true);
+        if (!prefs.getBoolean(XiaomiPreferences.FEAT_SPO2_ALL_DAY, false)) {
+            // all-day is the last entry
+            final CharSequence[] entries = modePref.getEntries();
+            final CharSequence[] values = modePref.getEntryValues();
+            modePref.setEntries(Arrays.copyOf(entries, entries.length - 1));
+            modePref.setEntryValues(Arrays.copyOf(values, values.length - 1));
+        }
+
+        final Preference allDayPref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING);
+        if (allDayPref != null) {
+            allDayPref.setVisible(false);
+        }
+
+        // the low alert applies in sleep-only mode as well, not just all-day
+        final Preference lowAlertPref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_SPO2_LOW_ALERT_THRESHOLD);
+        if (lowAlertPref != null) {
+            lowAlertPref.setDependency(null);
+        }
     }
 
     @Override

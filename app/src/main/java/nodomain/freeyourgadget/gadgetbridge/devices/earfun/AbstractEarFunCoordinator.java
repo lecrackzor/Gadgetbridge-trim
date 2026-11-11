@@ -31,8 +31,8 @@ public abstract class AbstractEarFunCoordinator extends AbstractBLClassicDeviceC
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return EarFunDeviceSupport.class;
+    public DeviceSupport createDeviceSupport(final GBDevice device) {
+        return new EarFunDeviceSupport();
     }
 
     @Override
@@ -84,5 +84,20 @@ public abstract class AbstractEarFunCoordinator extends AbstractBLClassicDeviceC
         LOG.debug("Found EarFun device with product ID {}", StringUtils.bytesToHex(pid));
 
         return pid;
+    }
+
+    @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsPhoneCalls(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return true;
     }
 }

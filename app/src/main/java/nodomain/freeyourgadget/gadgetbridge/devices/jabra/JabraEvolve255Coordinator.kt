@@ -45,8 +45,8 @@ open class JabraEvolve255Coordinator : AbstractBLClassicDeviceCoordinator() {
         return "Jabra"
     }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport?> {
-        return JabraEvolve255Support::class.java
+    override fun createDeviceSupport(device: GBDevice): DeviceSupport {
+        return JabraEvolve255Support()
     }
 
     override fun getDeviceNameResource(): Int {
@@ -353,6 +353,12 @@ open class JabraEvolve255Coordinator : AbstractBLClassicDeviceCoordinator() {
             }
         }
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 
     companion object {
         private val DEVICE_CARD_ACTION_ANC = deviceCardAction {
