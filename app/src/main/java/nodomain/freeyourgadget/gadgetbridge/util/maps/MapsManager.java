@@ -194,6 +194,7 @@ public final class MapsManager {
             mapView.addLayer(polyline);
         }
         polyline.setPoints(points);
+        polyline.requestRedraw();
 
         if (!fitBounds) {
             // Keep an already-fitted view stable (trim slider); still attach tiles if needed.

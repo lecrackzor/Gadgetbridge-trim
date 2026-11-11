@@ -20,6 +20,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -76,6 +78,8 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     private var mapsReady: Boolean = false
 
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    private val mapPreviewHandler = Handler(Looper.getMainLooper())
+    private val mapPreviewRunnable = Runnable { drawKeptTrack(fitBounds = false) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,7 +121,8 @@ class WorkoutTrimActivity : AbstractGBActivity() {
             override fun onStartTrackingTouch(slider: RangeSlider) = Unit
 
             override fun onStopTrackingTouch(slider: RangeSlider) {
-                // Map work only on finger-up — mid-drag polyline rebuilds are a common ANR source.
+                // Flush any pending debounced redraw and sync labels/times.
+                mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
                 updatePreview(syncSlider = false, fromUser = false)
             }
         })
@@ -257,10 +262,14 @@ class WorkoutTrimActivity : AbstractGBActivity() {
         }
 
         if (!mapsReady) return
-        // While dragging, only update the cheap text stats — never touch Mapsforge mid-gesture.
-        if (fromUser) return
 
-        drawKeptTrack(fitBounds = !mapFitted)
+        mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
+        if (fromUser && mapFitted) {
+            // Live preview while dragging, but debounced so Mapsforge cannot ANR the UI.
+            mapPreviewHandler.postDelayed(mapPreviewRunnable, MAP_PREVIEW_DEBOUNCE_MS)
+        } else {
+            drawKeptTrack(fitBounds = !mapFitted)
+        }
     }
 
     private fun drawKeptTrack(fitBounds: Boolean) {
@@ -281,7 +290,7 @@ class WorkoutTrimActivity : AbstractGBActivity() {
         }
         if (gpsPoints.size < 2) return
         try {
-            // Fit once to the full track so dragging only redraws the polyline.
+            // Fit once to the full track so later slider moves only replace the polyline.
             if (fitBounds && !mapFitted) {
                 val fullGps = ArrayList<GPSCoordinate>(points.size)
                 for (p in points) {
@@ -296,7 +305,9 @@ class WorkoutTrimActivity : AbstractGBActivity() {
                     mapFitted = true
                 }
             }
+            // Always draw the kept slice so the path shortens/grows with the handles.
             mapsManager?.setTrack(gpsPoints, false)
+            mapView.invalidate()
         } catch (e: Exception) {
             LOG.warn("Failed drawing trim preview track", e)
         }
@@ -448,6 +459,7 @@ class WorkoutTrimActivity : AbstractGBActivity() {
     }
 
     override fun onDestroy() {
+        mapPreviewHandler.removeCallbacks(mapPreviewRunnable)
         mapsManager?.onDestroy()
         mapsManager = null
         super.onDestroy()
@@ -460,6 +472,7 @@ class WorkoutTrimActivity : AbstractGBActivity() {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(WorkoutTrimActivity::class.java)
+        private const val MAP_PREVIEW_DEBOUNCE_MS = 32L
         const val EXTRA_WORKOUT_ID = "workout_id"
 
         fun createIntent(context: Context, workoutId: Long): Intent {

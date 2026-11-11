@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -78,10 +79,12 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
     @NonNull
     @Override
     public List<HrvSummarySample> getAllSamples(long timestampFrom, long timestampTo) {
-        // For each day in the range, generate a summary sample
+        // Prefetch once for the whole requested range (+ baseline lookback). Calling
+        // generateSummaryForDay per day used to re-query ~28 days of activity/HRV samples
+        // for every night, holding the DB lock for tens of seconds and stalling other tabs.
+        final Prefetch prefetch = prefetchForRange(timestampFrom, timestampTo);
         final List<HrvSummarySample> summaries = new ArrayList<>();
 
-        // Start from the beginning of the first day
         final Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(timestampFrom);
         cal.set(Calendar.HOUR_OF_DAY, 0);
@@ -89,24 +92,21 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
 
-        // Continue until we've processed all days up to timestampTo
         final Calendar endCal = Calendar.getInstance();
         endCal.setTimeInMillis(timestampTo);
 
         while (cal.getTimeInMillis() <= endCal.getTimeInMillis()) {
-            // Generate summary for this day (at end of day timestamp)
             final Calendar dayEnd = (Calendar) cal.clone();
             dayEnd.set(Calendar.HOUR_OF_DAY, 23);
             dayEnd.set(Calendar.MINUTE, 59);
             dayEnd.set(Calendar.SECOND, 59);
             dayEnd.set(Calendar.MILLISECOND, 999);
 
-            final HrvSummarySample summary = generateSummaryForDay(dayEnd.getTimeInMillis());
+            final HrvSummarySample summary = generateSummaryForDay(dayEnd.getTimeInMillis(), prefetch);
             if (summary != null) {
                 summaries.add(summary);
             }
 
-            // Move to next day
             cal.add(Calendar.DATE, 1);
         }
 
@@ -118,6 +118,10 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
      * The timestamp should be at the end of the day (23:59:59).
      */
     private HrvSummarySample generateSummaryForDay(long dayEndTimestamp) {
+        return generateSummaryForDay(dayEndTimestamp, prefetchForRange(dayEndTimestamp, dayEndTimestamp));
+    }
+
+    private HrvSummarySample generateSummaryForDay(long dayEndTimestamp, Prefetch prefetch) {
         // Check cache first - use device MAC address as part of cache key to separate devices
         final String cacheKey = device.getAddress() + ":" + dayEndTimestamp;
         final HrvSummarySample cached = SUMMARY_CACHE.get(cacheKey);
@@ -135,8 +139,7 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
         dayStart.set(Calendar.SECOND, 0);
         dayStart.set(Calendar.MILLISECOND, 0);
 
-        // Get value samples for the current day
-        final List<? extends HrvValueSample> todaySamples = valueProvider.getAllSamples(
+        final List<? extends HrvValueSample> todaySamples = prefetch.hrvBetween(
                 dayStart.getTimeInMillis(),
                 dayEndTimestamp
         );
@@ -148,11 +151,13 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
         // Calculate weekly average (past 7 days including today)
         final Calendar weekStart = (Calendar) dayStart.clone();
         weekStart.add(Calendar.DATE, -DAYS_FOR_WEEKLY_AVG + 1);
-        final int weeklyAvg = calculateAverageHrv(weekStart.getTimeInMillis(), dayEndTimestamp);
+        final int weeklyAvg = calculateAverageHrv(
+                weekStart.getTimeInMillis(),
+                dayEndTimestamp,
+                prefetch
+        );
 
-        // Calculate last night average using actual sleep sessions
-        // Get activity samples for a 24-hour window that should contain the previous night's sleep
-        // (from noon of previous day to noon of current day)
+        // Previous night: noon-to-noon window ending at today's noon
         final Calendar searchStart = (Calendar) dayStart.clone();
         searchStart.add(Calendar.DATE, -1);
         searchStart.set(Calendar.HOUR_OF_DAY, 12);
@@ -166,31 +171,22 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
         searchEnd.set(Calendar.SECOND, 0);
         searchEnd.set(Calendar.MILLISECOND, 0);
 
-        final int startTs = (int) (searchStart.getTimeInMillis() / 1000);
-        final int endTs = (int) (searchEnd.getTimeInMillis() / 1000);
-
         int lastNightAvg = 0;
         int lastNight5MinHigh = 0;
 
-        // Find the previous night's sleep session
-        final List<SleepSession> sleepSessions = device.getDeviceCoordinator()
-            .getSleepSessionProvider(device, session)
-            .getSleepSessions(startTs, endTs);
-
-        // Use the last (most recent) sleep session - this should be the previous night
-        if (!sleepSessions.isEmpty()) {
-            final SleepSession lastSession = sleepSessions.get(sleepSessions.size() - 1);
+        final SleepSession lastSession = lastSessionStartingBetween(
+                prefetch.sessions,
+                searchStart.getTimeInMillis(),
+                searchEnd.getTimeInMillis()
+        );
+        if (lastSession != null) {
             final long sessionStart = lastSession.getStartTime();
             final long sessionEnd = lastSession.getEndTime();
-
-            lastNightAvg = calculateAverageHrv(sessionStart, sessionEnd);
-            lastNight5MinHigh = calculate5MinHighHrv(sessionStart, sessionEnd);
+            lastNightAvg = calculateAverageHrv(sessionStart, sessionEnd, prefetch);
+            lastNight5MinHigh = calculate5MinHighHrv(sessionStart, sessionEnd, prefetch);
         }
 
-        // Calculate baseline values (using past 28 overnight averages)
-        final BaselineValues baseline = calculateBaseline(dayEndTimestamp);
-
-        // Determine status based on weekly average and baseline
+        final BaselineValues baseline = calculateBaseline(dayEndTimestamp, prefetch);
         final HrvSummarySample.Status status = determineStatus(weeklyAvg, baseline);
 
         final HrvSummarySample summary = new ComputedHrvSummarySample(
@@ -204,39 +200,83 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
                 status
         );
 
-        // Cache the computed summary for future use
         SUMMARY_CACHE.put(cacheKey, summary);
-
         return summary;
     }
 
-    private int calculateAverageHrv(long timestampFrom, long timestampTo) {
-        final List<? extends HrvValueSample> samples = valueProvider.getAllSamples(timestampFrom, timestampTo);
+    private Prefetch prefetchForRange(long timestampFrom, long timestampTo) {
+        final Calendar latestWindowEnd = Calendar.getInstance();
+        latestWindowEnd.setTimeInMillis(Math.max(timestampFrom, timestampTo));
+        latestWindowEnd.set(Calendar.HOUR_OF_DAY, 12);
+        latestWindowEnd.set(Calendar.MINUTE, 0);
+        latestWindowEnd.set(Calendar.SECOND, 0);
+        latestWindowEnd.set(Calendar.MILLISECOND, 0);
+        // Ensure noon window is at least on the day of timestampTo
+        if (latestWindowEnd.getTimeInMillis() < timestampTo) {
+            latestWindowEnd.add(Calendar.DATE, 1);
+            latestWindowEnd.set(Calendar.HOUR_OF_DAY, 12);
+            latestWindowEnd.set(Calendar.MINUTE, 0);
+            latestWindowEnd.set(Calendar.SECOND, 0);
+            latestWindowEnd.set(Calendar.MILLISECOND, 0);
+        }
+
+        final Calendar earliestWindowStart = Calendar.getInstance();
+        earliestWindowStart.setTimeInMillis(Math.min(timestampFrom, timestampTo));
+        earliestWindowStart.set(Calendar.HOUR_OF_DAY, 12);
+        earliestWindowStart.set(Calendar.MINUTE, 0);
+        earliestWindowStart.set(Calendar.SECOND, 0);
+        earliestWindowStart.set(Calendar.MILLISECOND, 0);
+        earliestWindowStart.add(Calendar.DATE, -DAYS_FOR_BASELINE);
+
+        final long sessionFromMs = earliestWindowStart.getTimeInMillis();
+        final long sessionToMs = latestWindowEnd.getTimeInMillis();
+
+        final List<SleepSession> sessions = device.getDeviceCoordinator()
+                .getSleepSessionProvider(device, session)
+                .getSleepSessions(
+                        (int) (sessionFromMs / 1000L),
+                        (int) (sessionToMs / 1000L)
+                );
+
+        // Cover weekly averages and overnight HRV for every night in the baseline window.
+        final long hrvFrom = Math.min(timestampFrom, sessionFromMs) - TimeUnit.DAYS.toMillis(DAYS_FOR_WEEKLY_AVG);
+        final long hrvTo = Math.max(timestampTo, sessionToMs);
+        final List<? extends HrvValueSample> hrvValues = valueProvider.getAllSamples(hrvFrom, hrvTo);
+
+        return new Prefetch(sessions, hrvValues);
+    }
+
+    private int calculateAverageHrv(long timestampFrom, long timestampTo, Prefetch prefetch) {
+        final List<? extends HrvValueSample> samples = prefetch.hrvBetween(timestampFrom, timestampTo);
         if (samples.isEmpty()) {
             return 0;
         }
 
-        return (int) samples.stream()
-                .mapToInt(HrvValueSample::getValue)
-                .filter(v -> v > 0) // Filter out invalid values
-                .average()
-                .orElse(0);
+        long sum = 0;
+        int count = 0;
+        for (final HrvValueSample sample : samples) {
+            final int value = sample.getValue();
+            if (value > 0) {
+                sum += value;
+                count++;
+            }
+        }
+        return count == 0 ? 0 : (int) (sum / count);
     }
 
-    private int calculate5MinHighHrv(long timestampFrom, long timestampTo) {
-        final List<? extends HrvValueSample> samples = valueProvider.getAllSamples(timestampFrom, timestampTo);
+    private int calculate5MinHighHrv(long timestampFrom, long timestampTo, Prefetch prefetch) {
+        final List<? extends HrvValueSample> samples = prefetch.hrvBetween(timestampFrom, timestampTo);
         if (samples.size() < 5) {
             return 0;
         }
 
-        // Calculate rolling 5-minute averages and find the highest
         int maxAvg = 0;
         for (int i = 0; i <= samples.size() - 5; i++) {
             int sum = 0;
             for (int j = i; j < i + 5; j++) {
                 sum += samples.get(j).getValue();
             }
-            int avg = sum / 5;
+            final int avg = sum / 5;
             if (avg > maxAvg) {
                 maxAvg = avg;
             }
@@ -245,73 +285,51 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
         return maxAvg;
     }
 
-    private BaselineValues calculateBaseline(long timestampTo) {
-        // Calculate baseline using Garmin's approach:
-        // Get overnight HRV averages for the last 28 days, then calculate mean ± standard deviation
-
+    private BaselineValues calculateBaseline(long timestampTo, Prefetch prefetch) {
         final List<Integer> overnightAverages = new ArrayList<>();
         final Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(timestampTo);
 
-        // Fetch every sleep session across the whole 28-day span, then iterate day by day
-        // (noon-to-noon windows), picking the last-starting session in each, most recent day first.
         final Calendar latestWindowEnd = (Calendar) cal.clone();
         latestWindowEnd.set(Calendar.HOUR_OF_DAY, 12);
         latestWindowEnd.set(Calendar.MINUTE, 0);
         latestWindowEnd.set(Calendar.SECOND, 0);
         latestWindowEnd.set(Calendar.MILLISECOND, 0);
 
-        final Calendar earliestWindowStart = (Calendar) latestWindowEnd.clone();
-        earliestWindowStart.add(Calendar.DATE, -DAYS_FOR_BASELINE);
-
-        final List<SleepSession> allSessions = device.getDeviceCoordinator()
-            .getSleepSessionProvider(device, session)
-            .getSleepSessions(
-                (int) (earliestWindowStart.getTimeInMillis() / 1000),
-                (int) (latestWindowEnd.getTimeInMillis() / 1000)
-            );
-
-        // Collect overnight averages for the past 28 days
         final Calendar windowEnd = (Calendar) latestWindowEnd.clone();
         for (int i = 0; i < DAYS_FOR_BASELINE; i++) {
             final long windowEndMs = windowEnd.getTimeInMillis();
             final long windowStartMs = windowEndMs - 24L * 60 * 60 * 1000;
 
-            // Use the last sleep session in the window (should be the previous night)
-            SleepSession lastSession = null;
-            for (final SleepSession candidate : allSessions) {
-                if (candidate.getStartTime() >= windowStartMs && candidate.getStartTime() < windowEndMs) {
-                    if (lastSession == null || candidate.getStartTime() > lastSession.getStartTime()) {
-                        lastSession = candidate;
-                    }
-                }
-            }
-
+            final SleepSession lastSession = lastSessionStartingBetween(
+                    prefetch.sessions,
+                    windowStartMs,
+                    windowEndMs
+            );
             if (lastSession != null) {
-                final int nightAvg = calculateAverageHrv(lastSession.getStartTime(), lastSession.getEndTime());
+                final int nightAvg = calculateAverageHrv(
+                        lastSession.getStartTime(),
+                        lastSession.getEndTime(),
+                        prefetch
+                );
                 if (nightAvg > 0) {
                     overnightAverages.add(nightAvg);
                 }
             }
 
-            // Move to previous day
             windowEnd.add(Calendar.DATE, -1);
         }
 
-        // Require at least DAYS_FOR_WEEKLY_AVG of overnight data before calculating a baseline
-        // This prevents unreliable status calculations in the first few days
         if (overnightAverages.size() < DAYS_FOR_WEEKLY_AVG) {
             return new BaselineValues(0, 0, 0);
         }
 
-        // Calculate mean
         double sum = 0;
         for (int value : overnightAverages) {
             sum += value;
         }
         final double mean = sum / overnightAverages.size();
 
-        // Calculate standard deviation
         double varianceSum = 0;
         for (int value : overnightAverages) {
             final double diff = value - mean;
@@ -319,19 +337,52 @@ public class ComputedHrvSummarySampleProvider implements TimeSampleProvider<HrvS
         }
         final double stdDev = Math.sqrt(varianceSum / overnightAverages.size());
 
-        // Baseline range is mean ± 1 standard deviation, rounded to whole numbers
         final int baselineLower = (int) Math.round(mean - stdDev);
         final int baselineUpper = (int) Math.round(mean + stdDev);
-
-        // For the "low upper" threshold, we use a value below the lower baseline boundary
-        // This creates three ranges:
-        // Poor: < (mean - 1.5 * stdDev)
-        // Low: < (mean - stdDev)
-        // Balanced: (mean - stdDev) to (mean + stdDev)
-        // Unbalanced: > (mean + stdDev)
         final int poorThreshold = (int) Math.round(mean - 1.5 * stdDev);
 
         return new BaselineValues(poorThreshold, baselineLower, baselineUpper);
+    }
+
+    @Nullable
+    static SleepSession lastSessionStartingBetween(
+            final List<SleepSession> sessions,
+            final long windowStartMs,
+            final long windowEndMs
+    ) {
+        SleepSession lastSession = null;
+        for (final SleepSession candidate : sessions) {
+            if (candidate.getStartTime() >= windowStartMs && candidate.getStartTime() < windowEndMs) {
+                if (lastSession == null || candidate.getStartTime() > lastSession.getStartTime()) {
+                    lastSession = candidate;
+                }
+            }
+        }
+        return lastSession;
+    }
+
+    private static final class Prefetch {
+        final List<SleepSession> sessions;
+        final List<? extends HrvValueSample> hrvValues;
+
+        Prefetch(final List<SleepSession> sessions, final List<? extends HrvValueSample> hrvValues) {
+            this.sessions = sessions;
+            this.hrvValues = hrvValues;
+        }
+
+        List<? extends HrvValueSample> hrvBetween(final long fromMs, final long toMs) {
+            if (hrvValues.isEmpty()) {
+                return Collections.emptyList();
+            }
+            final List<HrvValueSample> out = new ArrayList<>();
+            for (final HrvValueSample sample : hrvValues) {
+                final long ts = sample.getTimestamp();
+                if (ts >= fromMs && ts <= toMs) {
+                    out.add(sample);
+                }
+            }
+            return out;
+        }
     }
 
     private HrvSummarySample.Status determineStatus(int weeklyAvg, BaselineValues baseline) {
